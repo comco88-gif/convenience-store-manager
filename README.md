@@ -4,8 +4,7 @@
 
 ## 바로 플레이
 
-- 웹: GitHub Pages 주소 (저장소 Settings → Pages에서 확인)
-- 로컬: `index.html`을 브라우저로 열기
+저장소를 받은 뒤 `index.html`을 브라우저로 열면 바로 실행됩니다.
 
 ## 조작
 
