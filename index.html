@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>나는 편의점 점장이다</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#122029">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="편의점 점장">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700;900&display=swap">
 <style>
@@ -160,7 +167,7 @@ kbd{font-family:inherit;font-size:11px;background:var(--night);border:1px solid 
     <div class="stat"><small>순이익</small><b id="hNet">0원</b></div>
     <div class="stat"><small>평점</small><b><span class="stars" id="hStars">★★★☆☆</span> <span id="hRate">3.0</span></b></div>
     <div class="stat"><small>체력</small><div class="stam"><i id="hStam" style="width:100%"></i></div></div>
-    <div class="hbtns"><button id="pauseBtn" type="button">일시정지</button><button id="muteBtn" type="button">소리 켜짐</button></div>
+    <div class="hbtns"><button id="fsBtn" type="button" hidden>전체화면</button><button id="pauseBtn" type="button">일시정지</button><button id="muteBtn" type="button">소리 켜짐</button></div>
   </header>
 
   <div class="stage" id="stage">
@@ -377,6 +384,18 @@ stick.addEventListener('pointerdown', e => { e.preventDefault(); stickId = e.poi
 stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickSet(e); });
 stick.addEventListener('pointerup', stickEnd); stick.addEventListener('pointercancel', stickEnd);
 document.getElementById('pauseBtn').onclick = () => { if (mode === 'play') pause(); };
+// fullscreen: home-screen launches are already fullscreen; in a browser tab, offer a button where the API exists (not iPhone Safari)
+const fsBtn = document.getElementById('fsBtn');
+const installed = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone;
+fsBtn.hidden = installed || !document.fullscreenEnabled;
+fsBtn.onclick = async () => {
+  try {
+    if (document.fullscreenElement) { await document.exitFullscreen(); return; }
+    await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    await screen.orientation?.lock?.('landscape');
+  } catch (err) { /* refused or unsupported: keep playing in the tab */ }
+};
+document.addEventListener('fullscreenchange', () => { fsBtn.textContent = document.fullscreenElement ? '전체화면 끄기' : '전체화면'; });
 // iOS shows the copy/select menu on long press even when pointer events are cancelled, so cancel the touch itself
 const noTouchMenu = el => {
   el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
@@ -1274,12 +1293,12 @@ function showTitle() {
   mode = 'title';
   screenEl.hidden = false;
   screenEl.innerHTML = `<div class="card">
-    <span class="tag">PROTOTYPE v0.4.1</span>
+    <span class="tag">PROTOTYPE v0.4.2</span>
     <h1>나는 편의점 점장이다</h1>
     <p>오늘부터 당신이 이 가게의 점장. 박스를 나르고, 바코드를 찍고, 도시락을 데우고,<br>쏟아진 음료를 닦고, 도둑을 잡으세요. 08:00부터 22:00까지, 약 3분 30초의 하루.</p>
     <div class="shop" id="setup"></div>
     <button class="btn" id="startBtn" type="button">영업 시작</button>
-    <p style="font-size:12px" class="keys">키보드: WASD·방향키 이동 / E·Space 행동 / Shift 달리기 / Q 계산 멈추기 / P 일시정지<br>휴대폰: 왼쪽 패드로 이동, 오른쪽 버튼으로 행동·달리기 (가로 화면 추천)</p>
+    <p style="font-size:12px" class="keys">키보드: WASD·방향키 이동 / E·Space 행동 / Shift 달리기 / Q 계산 멈추기 / P 일시정지<br>휴대폰: 왼쪽 패드로 이동, 오른쪽 버튼으로 행동·달리기 (가로 화면 추천)<br>브라우저 메뉴에서 "홈 화면에 추가"를 하면 앱처럼 전체 화면으로 열려요</p>
   </div>`;
   renderSetup();
   $('startBtn').onclick = () => startGame(savedDay);

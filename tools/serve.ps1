@@ -1,9 +1,9 @@
-# 로컬 개발 서버 (Node/Python 없이 Windows PowerShell만으로 동작)
+﻿# 로컬 개발 서버 (Node/Python 없이 Windows PowerShell만으로 동작)
 # 사용법: powershell -ExecutionPolicy Bypass -File tools/serve.ps1 [-Port 8765]
 param([int]$Port = 8765)
 $root = Split-Path -Parent $PSScriptRoot
 $types = @{ '.html' = 'text/html; charset=utf-8'; '.js' = 'text/javascript; charset=utf-8'; '.css' = 'text/css; charset=utf-8';
-  '.json' = 'application/json'; '.png' = 'image/png'; '.jpg' = 'image/jpeg'; '.svg' = 'image/svg+xml'; '.mp3' = 'audio/mpeg'; '.wav' = 'audio/wav' }
+  '.json' = 'application/json'; '.webmanifest' = 'application/manifest+json'; '.png' = 'image/png'; '.jpg' = 'image/jpeg'; '.svg' = 'image/svg+xml'; '.mp3' = 'audio/mpeg'; '.wav' = 'audio/wav' }
 $l = New-Object System.Net.HttpListener
 $l.Prefixes.Add("http://localhost:$Port/")
 $l.Start()

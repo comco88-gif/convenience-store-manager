@@ -12,7 +12,8 @@
 - 외부 의존성은 Google Fonts(Black Han Sans, Noto Sans KR)뿐.
 - 로컬 실행: `powershell -ExecutionPolicy Bypass -File tools/serve.ps1` → http://localhost:8765
 - 공개 저장소. GitHub Pages(main 브랜치 루트)로 배포: https://comco88-gif.github.io/convenience-store-manager/ — main에 push하면 자동 반영.
-- claude.ai 아티팩트(https://claude.ai/artifact/7NCDHguvmJf2LrhwxR6bBb)도 함께 갱신한다. `index.html`에서 doctype/html/head/body 래퍼 줄을 뺀 사본을 `.artifact/convenience-manager.html`(git 제외)에 만들어 이 URL로 publish.
+- claude.ai 아티팩트(https://claude.ai/artifact/7NCDHguvmJf2LrhwxR6bBb)도 함께 갱신한다. `powershell -ExecutionPolicy Bypass -File tools/build-artifact.ps1`로 문서 래퍼와 PWA 줄을 뺀 사본 `.artifact/convenience-manager.html`(git 제외)을 만들어 이 URL로 publish.
+- 홈 화면 앱(PWA): `manifest.webmanifest`(전체 화면, 가로 고정), `icons/`(192·512·apple-touch 180). 서비스 워커는 없음(오프라인 미지원, 대신 항상 최신 버전). 브라우저 탭에서는 HUD "전체화면" 버튼(Fullscreen API, 아이폰 사파리는 미지원이라 숨김).
 
 ## 현재 구현 (v0.4)
 - 하루 영업 08:00–22:00 (실시간 약 3분 30초), 점심·저녁 러시.
