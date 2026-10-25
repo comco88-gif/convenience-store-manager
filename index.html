@@ -102,6 +102,9 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;touch-action:none
 .pad button{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:10px;font-size:20px;font-weight:700;touch-action:none}
 .pad button:active,.pad button.on{background:var(--line)}
 button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+/* a game, not a document: no text selection or long-press copy menu */
+.app{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+canvas{-webkit-touch-callout:none}
 .hbtns{display:flex;gap:6px}
 .seg{display:flex;gap:6px}
 .seg button{flex:1;min-width:0;background:var(--night);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 6px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -374,6 +377,14 @@ stick.addEventListener('pointerdown', e => { e.preventDefault(); stickId = e.poi
 stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickSet(e); });
 stick.addEventListener('pointerup', stickEnd); stick.addEventListener('pointercancel', stickEnd);
 document.getElementById('pauseBtn').onclick = () => { if (mode === 'play') pause(); };
+// iOS shows the copy/select menu on long press even when pointer events are cancelled, so cancel the touch itself
+const noTouchMenu = el => {
+  el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  el.addEventListener('contextmenu', e => e.preventDefault());
+};
+[stick, cv, ...document.querySelectorAll('.pad button')].forEach(noTouchMenu);
+document.addEventListener('selectstart', e => { if (mode === 'play') e.preventDefault(); });
+document.addEventListener('contextmenu', e => { if (mode === 'play') e.preventDefault(); });
 
 function press(k) {
   if (mode === 'paused' && (k === 'pause' || k === 'action')) { resume(); return; }
@@ -1263,7 +1274,7 @@ function showTitle() {
   mode = 'title';
   screenEl.hidden = false;
   screenEl.innerHTML = `<div class="card">
-    <span class="tag">PROTOTYPE v0.4</span>
+    <span class="tag">PROTOTYPE v0.4.1</span>
     <h1>나는 편의점 점장이다</h1>
     <p>오늘부터 당신이 이 가게의 점장. 박스를 나르고, 바코드를 찍고, 도시락을 데우고,<br>쏟아진 음료를 닦고, 도둑을 잡으세요. 08:00부터 22:00까지, 약 3분 30초의 하루.</p>
     <div class="shop" id="setup"></div>
