@@ -44,6 +44,16 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;touch-action:none
 .report{width:100%;display:grid;grid-template-columns:1fr auto;gap:6px 16px;text-align:left;font-size:14px;font-variant-numeric:tabular-nums;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px}
 .report dt{color:var(--muted)} .report dd{margin:0;text-align:right;font-weight:700}
 .report .sum{border-top:1px dashed var(--line);padding-top:6px}
+.shop{width:100%;display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--panel);border:1px solid var(--sign);border-radius:8px;padding:12px 14px}
+.shop-head{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;font-variant-numeric:tabular-nums}
+.shop-head>b{font-family:var(--display);font-weight:400;font-size:18px;color:var(--sign)}
+.up{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.up-txt{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px}
+.up-txt small{color:var(--muted);font-size:11px;font-weight:400}
+.up button{flex:none;min-width:86px;background:var(--sign);color:#2a1a00;border:0;border-radius:6px;padding:7px 10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;font-variant-numeric:tabular-nums}
+.up button:disabled{background:var(--line);color:var(--muted);cursor:default}
+.up.owned button:disabled{background:none;border:1px solid var(--mint);color:var(--mint)}
+.up button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .mini{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:min(560px,94%);max-height:calc(100% - 16px);overflow:auto;background:var(--panel);border:2px solid var(--sign);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .mini.shake{animation:shake .25s}
 @keyframes shake{25%{transform:translateX(calc(-50% - 6px))}75%{transform:translateX(calc(-50% + 6px))}}
@@ -134,7 +144,8 @@ kbd{font-family:inherit;font-size:11px;background:var(--night);border:1px solid 
     <div><b>이동</b> <kbd>WASD</kbd> / <kbd>방향키</kbd><br><b>달리기</b> <kbd>Shift</kbd> (체력 소모)<br><b>행동</b> <kbd>E</kbd> / <kbd>Space</kbd> · 꾹 누르면 진열·걸레질</div>
     <div><b>창고</b>에서 박스를 꺼내 같은 종류 <b>선반</b>에 진열하세요. 품절이면 손님이 화를 냅니다.</div>
     <div><b>계산대</b>에서 방향키로 바코드 스캔, 전자레인지 타이밍, 거스름돈 계산. <kbd>Q</kbd>로 계산을 멈추고 도둑을 쫓을 수 있어요.</div>
-    <div><b>후드 쓴 손님</b>이 <b style="color:var(--tag)">!</b>를 띄우고 출구로 뛰면 도둑입니다. 몸으로 막아서 잡으세요. 바닥에 쏟아진 음료는 걸레질!</div>
+    <div><b>도둑</b>은 평범한 손님처럼 들어와요. 물건 앞에서 두리번거리다 계산대가 아니라 <b>출구로 슬금슬금</b> 가면 의심하세요. 가까이 가면 <b style="color:var(--tag)">!</b>를 띄우고 달아나요. 몸으로 막아서 잡으세요.</div>
+    <div><b>점포 투자</b> · 마감 정산 화면에서 번 돈으로 운동화, 대용량 박스, 선반 확장, 고속 스캐너, CCTV, 알바를 살 수 있어요.</div>
     <div><b>돌발 이벤트</b> · 🚚 <b>물류 입고</b>: 입구 박스를 창고의 같은 칸에 넣으면 무료 박스로 적립. 🛵 <b>배달 주문</b>: 선반을 돌며 담아 라이더에게. 🍺 <b>취객</b>: E로 달래서 입구까지 데리고 나가세요.</div>
   </section>
 </div>
@@ -150,7 +161,17 @@ const CATS = ['dosirak', 'ramen', 'snack', 'drink'];
 const NAME = { dosirak: '도시락', ramen: '라면', snack: '과자', drink: '음료' };
 const ICON = { dosirak: '🍱', ramen: '🍜', snack: '🍪', drink: '🥤' };
 const PRICE = { dosirak: 4500, ramen: 1500, snack: 1800, drink: 1600 };
-const MAXSTOCK = 12, BOX = 8, WHOLESALE = 0.55;
+let MAXSTOCK = 12, BOX = 8; // set per day from upgrades
+const WHOLESALE = 0.55, CLERK_WAGE = 20000;
+const UPGRADES = [
+  { id: 'shoes', name: '쿠션 운동화', desc: '이동 속도 +12% (단계마다)', costs: [30000, 60000] },
+  { id: 'cart', name: '대용량 박스', desc: '박스 한 개에 8개 → 12개', costs: [40000] },
+  { id: 'shelf', name: '선반 확장', desc: '선반 최대 진열 12개 → 16개', costs: [50000] },
+  { id: 'scanner', name: '고속 스캐너', desc: '스캔 실수 멈춤이 짧고, 계산 중 손님 인내심이 거의 안 줄어요', costs: [35000] },
+  { id: 'cctv', name: 'CCTV', desc: '물건을 챙긴 도둑에게 빨간 표시, 출구로 향하면 알림', costs: [45000] },
+  { id: 'clerk', name: '알바 고용', desc: `계산대를 비우면 알바가 대신 계산 (매일 일당 ${CLERK_WAGE.toLocaleString('ko-KR')}원)`, costs: [25000] },
+];
+const NO_UPGRADES = () => Object.fromEntries(UPGRADES.map(u => [u.id, 0]));
 const SHELF = {
   dosirak: { x: 440, y: 20, w: 320, h: 45 },
   ramen: { x: 440, y: 175, w: 280, h: 40 },
@@ -224,10 +245,13 @@ const SFX = {
 document.getElementById('muteBtn').onclick = e => { muted = !muted; e.currentTarget.textContent = muted ? '소리 꺼짐' : '소리 켜짐'; };
 
 // ---------- state ----------
-let G = null, mode = 'title', savedDay = { day: 1, rating: 3, bank: 0 };
+let G = null, mode = 'title', savedDay = { day: 1, rating: 3, bank: 0, up: NO_UPGRADES() };
 function newDay(carry) {
+  MAXSTOCK = carry.up.shelf ? 16 : 12;
+  BOX = carry.up.cart ? 12 : 8;
   G = {
     day: carry.day, rating: carry.rating, bank: carry.bank,
+    up: carry.up, wage: carry.up.clerk ? CLERK_WAGE : 0, clerkT: 0,
     time: 8 * 60, closed: false, spawnT: 1.5,
     player: { x: 160, y: 230, face: 1, stam: 1, walk: 0 },
     carry: null, holdT: 0, target: null,
@@ -237,7 +261,7 @@ function newDay(carry) {
     free: { dosirak: 0, ramen: 0, snack: 0, drink: 0 },
     drops: [], ship: null, order: null, events: makeEvents(carry.day), banner: null,
     stats: { served: 0, angry: 0, caught: 0, stolen: 0, slips: 0, cleaned: 0,
-      orders: 0, orderFail: 0, ships: 0, shipBoxes: 0, drunkOut: 0, drunkLeft: 0 },
+      orders: 0, orderFail: 0, ships: 0, shipBoxes: 0, drunkOut: 0, drunkLeft: 0, clerkServed: 0 },
   };
 }
 function float(x, y, txt, col = '#fff') { G.floats.push({ x, y, txt, col, t: 0 }); }
@@ -253,7 +277,7 @@ addEventListener('keydown', e => {
   if (mode === 'play' || ['up', 'down', 'left', 'right', 'action'].includes(k)) {
     if (!(mode !== 'play' && k === 'action' && document.activeElement && document.activeElement.tagName === 'BUTTON')) e.preventDefault();
   }
-  if (!held[k] && !e.repeat) { held[k] = true; press(k); }
+  if (!e.repeat) { held[k] = true; press(k); }
 });
 addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) held[k] = false; });
 addEventListener('blur', () => { for (const k in held) held[k] = false; });
@@ -367,7 +391,8 @@ function spawnCustomer() {
   const [x, y] = NODES.door;
   G.customers.push({
     x, y: y + 30, node: 'door', path: [], direct: null, state: 'shop', wants, wi: 0, cart: [], thief,
-    patience: 100, speed: rnd(75, 100), shirt: thief ? '#2b2f3a' : pick(SHIRTS), skin: pick(SKINS),
+    patience: 100, speed: rnd(75, 100), shirt: pick(SHIRTS), skin: pick(SKINS),
+    cap: Math.random() < (thief ? 0.6 : 0.15), lookT: 0,
     hair: pick(['#2b1d14', '#4a3222', '#111', '#7a5230']), bubble: null, waitT: 0, stun: 0, slipped: new Set(),
     wantHeat: Math.random() < 0.6, line: pick(LINES), walk: Math.random() * 6, face: -1,
   });
@@ -400,10 +425,25 @@ function leaveStore(c, fromQueue) {
   else c.path = bfs(c.node, 'door');
 }
 function angry(c, msg, fromQueue) {
-  rate(-0.15); G.stats.angry++; c.bubble = '😡';
+  rate(-0.1); G.stats.angry++; c.bubble = '😡';
   float(c.x, c.y - 40, msg, '#ff9a9a'); SFX.bad();
   if (c.cart.length) { c.cart.forEach(cat => { if (G.stock[cat] < MAXSTOCK) G.stock[cat]++; }); c.cart = []; }
   leaveStore(c, fromQueue);
+}
+function caught(c) {
+  G.stats.caught++; rate(0.15);
+  c.cart.forEach(cat => { if (G.stock[cat] < MAXSTOCK) G.stock[cat]++; });
+  c.cart = []; c.thief = false; c.bubble = '😰'; c.speed *= 0.7; c.stun = 0.8;
+  float(c.x, c.y - 44, '도둑 검거! 물건 회수', '#ffd166'); SFX.good();
+  c.state = 'leave';
+  if (!c.path.length) c.path = bfs(c.node, 'door');
+}
+function clerkServe(c) {
+  const total = cartTotal(c);
+  G.revenue += total; G.stats.served++; G.stats.clerkServed++; rate(0.03);
+  float(c.x, c.y - 44, `알바 계산 +${won(total)}`, '#ffd166'); SFX.coin();
+  G.queue.splice(G.queue.indexOf(c), 1); c.atSlot = false; c.cart = []; c.bubble = '🙂';
+  leaveStore(c, true);
 }
 function spawnPuddle(x, y) {
   if (G.puddles.length >= 4) return;
@@ -432,9 +472,9 @@ function runEvents() {
 }
 function showBanner(txt) { G.banner = { txt, t: 3.2 }; }
 function startShipment() {
-  const n = Math.min(8, 4 + G.day), boxes = [];
+  const n = Math.min(6, 3 + G.day), boxes = [];
   for (let i = 0; i < n; i++) boxes.push({ cat: pick(CATS), x: 575 + (i % 4) * 40, y: 522 + Math.floor(i / 4) * 34 });
-  const T = 40 + n * 4;
+  const T = 45 + n * 6;
   G.ship = { boxes, t: T, T, late: false };
   showBanner('🚚 물류 트럭 도착! 입구 박스를 창고 칸으로 옮기세요'); SFX.alarm();
 }
@@ -490,16 +530,17 @@ function escort(c) {
   float(c.x, c.y - 44, pick(['어~ 점장님~ 어디 가요~', '한 잔만 더~', '알았어 알았어~']), '#e0c3ff'); SFX.tick();
 }
 function updateCustomer(c, dt) {
-  const drain = 3.4 * (1 + 0.12 * (G.day - 1));
+  const drain = 2.8 * (1 + 0.12 * (G.day - 1));
   switch (c.state) {
     case 'shop': {
       if (c.wi >= c.wants.length) {
-        if (c.thief && c.cart.length) { c.state = 'flee'; c.path = bfs(c.node, 'door'); c.bubble = '!'; SFX.alarm(); float(c.x, c.y - 44, '도둑이야!', '#ff6b6b'); break; }
+        // thieves blend in, then sneak toward the exit instead of the queue
+        if (c.thief && c.cart.length) { c.state = 'sneak'; c.path = bfs(c.node, 'door'); c.bubble = null; c.lookT = 0; break; }
         if (!c.cart.length) { angry(c, '살 게 하나도 없네!'); break; }
         c.state = 'toQueue'; c.bubble = null; c.path = bfs(c.node, 'bl'); break;
       }
       const spot = 's_' + c.wants[c.wi];
-      c.bubble = c.thief ? null : ICON[c.wants[c.wi]];
+      c.bubble = ICON[c.wants[c.wi]];
       if (c.node !== spot && !c.path.length && !c.direct) c.path = bfs(c.node, spot);
       if (follow(c, dt) && c.node === spot) { c.state = 'pick'; c.waitT = 0; }
       break;
@@ -507,7 +548,8 @@ function updateCustomer(c, dt) {
     case 'pick': {
       c.waitT += dt;
       const cat = c.wants[c.wi];
-      if (c.waitT > 0.6) {
+      if (c.thief && (c.lookT += dt) > 0.35) { c.lookT = 0; c.face = -c.face; }
+      if (c.waitT > (c.thief ? 1.4 : 0.6)) {
         if (G.stock[cat] > 0) {
           G.stock[cat]--; c.cart.push(cat); c.wi++; c.state = 'shop'; c.bubble = null;
           if (cat === 'drink' && Math.random() < 0.18) spawnPuddle(rnd(700, 850), rnd(236, 282));
@@ -527,7 +569,7 @@ function updateCustomer(c, dt) {
       c.atSlot = stepTo(c, sx, sy, c.speed, dt) && i === 0;
       if (i === 0) c.face = -1;
       const serving = G.mini && G.mini.c === c;
-      c.patience -= drain * dt * (serving ? 0.35 : 1) * (i === 0 ? 1 : 0.8);
+      c.patience -= drain * dt * (serving ? (G.up.scanner ? 0.1 : 0.35) : 1) * (i === 0 ? 1 : 0.6);
       if (c.patience <= 0 && !serving) { G.queue.splice(i, 1); c.atSlot = false; angry(c, '너무 오래 기다렸어요!', true); }
       break;
     }
@@ -548,7 +590,7 @@ function updateCustomer(c, dt) {
       }
       c.annoyT += dt;
       if (c.annoyT > 1) {
-        c.annoyT = 0; rate(-0.006);
+        c.annoyT = 0; rate(-0.004);
         G.customers.forEach(o => { if (o !== c && !o.drunk && dist(o.x, o.y, c.x, c.y) < 90) o.patience -= 3; });
       }
       break;
@@ -568,15 +610,21 @@ function updateCustomer(c, dt) {
     case 'leave':
       if (follow(c, dt) && c.node === 'door') c.dead = true;
       break;
+    case 'sneak': {
+      const p = G.player, d = dist(p.x, p.y, c.x, c.y);
+      if (d < 30) { caught(c); break; }
+      if (d < 110 || c.node === 'lr' || c.node === 'door') {
+        c.state = 'flee'; c.bubble = '!'; SFX.alarm(); float(c.x, c.y - 44, '도둑이야!', '#ff6b6b');
+        if (!c.path.length) c.path = bfs(c.node, 'door');
+        break;
+      }
+      const sp0 = c.speed; c.speed = sp0 * 0.8; follow(c, dt); c.speed = sp0;
+      if ((c.lookT += dt) > 0.45) { c.lookT = 0; c.face = -c.face; }
+      break;
+    }
     case 'flee': {
       const p = G.player;
-      if (dist(p.x, p.y, c.x, c.y) < 30) {
-        G.stats.caught++; rate(0.15);
-        c.cart.forEach(cat => { if (G.stock[cat] < MAXSTOCK) G.stock[cat]++; });
-        c.cart = []; c.thief = false; c.bubble = '😰'; c.speed *= 0.7; c.stun = 0.8;
-        float(c.x, c.y - 44, '도둑 검거! 물건 회수', '#ffd166'); SFX.good();
-        c.state = 'leave'; break;
-      }
+      if (dist(p.x, p.y, c.x, c.y) < 30) { caught(c); break; }
       if (follow(c, dt) && c.node === 'door') {
         c.dead = true; G.stats.stolen++;
         const loss = c.cart.reduce((s, k) => s + PRICE[k], 0);
@@ -635,7 +683,7 @@ function miniPress(k) {
   if (m.phase === 'scan') {
     if (!ARW[k]) return;
     if (k === m.items[m.idx].key) { m.idx++; SFX.scan(); if (m.idx >= m.items.length) nextPhase(); else renderMini(); }
-    else { m.errors++; m.lock = 0.45; SFX.err(); renderMini(true); }
+    else { m.errors++; m.lock = G.up.scanner ? 0.15 : 0.45; SFX.err(); renderMini(true); }
   } else if (m.phase === 'heat') {
     if (k !== 'action') return;
     const pos = heatPos(m);
@@ -662,7 +710,7 @@ function heatPos(m) { return (Math.sin(m.heatT * m.hspeed - Math.PI / 2) + 1) / 
 function finishCheckout() {
   const m = G.mini, c = m.c, total = cartTotal(c);
   G.revenue += total; G.stats.served++;
-  let d = 0.05;
+  let d = 0.06;
   if (m.errors === 0) d += 0.03;
   if (c.patience > 60) d += 0.03;
   if (m.perfectHeat) d += 0.03;
@@ -749,7 +797,7 @@ function update(dt) {
   const dashing = held.dash && moving && p.stam > 0.02;
   p.stam = clamp(p.stam + (dashing ? -0.45 : 0.22) * dt, 0, 1);
   const inPuddle = G.puddles.some(pd => dist(p.x, p.y, pd.x, pd.y) < pd.r);
-  let sp = 210 * (dashing ? 1.7 : 1) * (inPuddle ? 0.55 : 1) * (G.carry && G.carry.kind === 'ship' ? 0.8 : 1);
+  let sp = 210 * (1 + 0.12 * G.up.shoes) * (dashing ? 1.7 : 1) * (inPuddle ? 0.55 : 1) * (G.carry && G.carry.kind === 'ship' ? 0.9 : 1);
   if (moving) {
     const l = Math.hypot(mx, my); mx /= l; my /= l;
     if (mx) p.face = Math.sign(mx);
@@ -774,6 +822,13 @@ function update(dt) {
     if (Math.random() < dt * 8) SFX.tick();
     if (t.pd.clean >= 1.1) { G.puddles.splice(G.puddles.indexOf(t.pd), 1); G.stats.cleaned++; rate(0.02); float(t.pd.x, t.pd.y - 20, '반짝반짝!', '#9fe8c9'); SFX.good(); }
   } else G.holdT = 0;
+  // part-timer covers the register while the player is away from it
+  if (G.up.clerk && !G.mini) {
+    const h = G.queue[0];
+    if (h && h.atSlot && dist(p.x, p.y, ...POS_SPOT) > 60) {
+      if ((G.clerkT += dt) >= 6) { G.clerkT = 0; clerkServe(h); }
+    } else G.clerkT = 0;
+  }
   // customers
   G.customers.forEach(c => updateCustomer(c, dt));
   G.customers = G.customers.filter(c => !c.dead);
@@ -814,7 +869,7 @@ function drawShelf(cat) {
   const fridge = cat === 'drink' || cat === 'dosirak';
   ctx.fillStyle = fridge ? '#cfe3ea' : '#8a6a4f'; rr(s.x, s.y, s.w, s.h, 4); ctx.fill();
   ctx.fillStyle = fridge ? '#a8c9d4' : '#6f533d'; rr(s.x + 4, s.y + 4, s.w - 8, s.h - 8, 3); ctx.fill();
-  ctx.font = `18px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `${MAXSTOCK > 12 ? 14 : 18}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (let i = 0; i < MAXSTOCK; i++) {
     const fx = vertical ? s.x + s.w / 2 : s.x + 16 + i * ((s.w - 32) / (MAXSTOCK - 1));
     const fy = vertical ? s.y + 16 + i * ((s.h - 32) / (MAXSTOCK - 1)) : s.y + s.h / 2;
@@ -886,6 +941,14 @@ function drawCounter() {
   ctx.fillStyle = G.queue[0] && G.queue[0].atSlot ? '#4fd1a5' : '#6f8b98'; ctx.fillRect(145, 288, 34, 14);
   ctx.fillStyle = '#ef4f4f'; ctx.fillRect(196, 300, 12, 8);
   ctx.fillStyle = '#33444d'; ctx.font = `700 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('계산대', 125, 345);
+  if (G.up.clerk) {
+    drawPerson(222, 258, { shirt: '#f5f5f0', skin: '#e0ac7e', hair: '#5a3a22', walk: 0, face: -1, apron: true });
+    ctx.fillStyle = '#33444d'; ctx.font = `700 9px ${FONT}`; ctx.fillText('알바', 222, 286);
+    if (G.clerkT > 0) {
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3; ctx.beginPath();
+      ctx.arc(222, 254, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (G.clerkT / 6)); ctx.stroke();
+    }
+  }
 }
 function drawPerson(x, y, o) {
   const bob = Math.sin(o.walk || 0) * 2;
@@ -895,6 +958,10 @@ function drawPerson(x, y, o) {
   if (o.hood) { ctx.fillStyle = '#1d2129'; ctx.beginPath(); ctx.arc(x, y - 13 + bob * 0.3, 12, 0, Math.PI * 2); ctx.fill(); }
   ctx.fillStyle = o.skin; ctx.beginPath(); ctx.arc(x + (o.face || 0) * 1.5, y - 13 + bob * 0.3, 9, 0, Math.PI * 2); ctx.fill();
   if (!o.hood) { ctx.fillStyle = o.hair; ctx.beginPath(); ctx.arc(x, y - 15 + bob * 0.3, 9, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
+  if (o.cap && !o.hood) {
+    ctx.fillStyle = '#22313f'; ctx.beginPath(); ctx.arc(x, y - 16 + bob * 0.3, 9.5, Math.PI, 0); ctx.fill();
+    ctx.fillRect(x + (o.face || 1) * 2 - 6, y - 17 + bob * 0.3, 12 + 4, 3);
+  }
   else { ctx.fillStyle = '#111'; ctx.fillRect(x - 7 + (o.face || 0) * 1.5, y - 15 + bob * 0.3, 14, 4); }
   ctx.fillStyle = '#222'; const ex = x + (o.face || 0) * 3;
   if (!o.hood) { ctx.fillRect(ex - 4, y - 13 + bob * 0.3, 2, 3); ctx.fillRect(ex + 2, y - 13 + bob * 0.3, 2, 3); }
@@ -914,7 +981,11 @@ function drawCustomer(c) {
     if (c.bubble) drawBubble(c.x + wob, c.y - 34, c.bubble, c.state === 'follow' ? '#e0c3ff' : '#fff');
     return;
   }
-  drawPerson(c.x, c.y, { shirt: c.shirt, skin: c.skin, hair: c.hair, walk: c.walk, face: c.face, hood: c.thief || c.state === 'flee' });
+  if (G.up.cctv && c.thief && c.cart.length) {
+    ctx.strokeStyle = '#ef4f4f'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.arc(c.x, c.y - 4, 24, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  }
+  drawPerson(c.x, c.y, { shirt: c.shirt, skin: c.skin, hair: c.hair, walk: c.walk, face: c.face, cap: c.cap, hood: c.state === 'flee' });
   if (c.cart.length) { ctx.fillStyle = '#e7d9b8'; ctx.fillRect(c.x + 8, c.y - 2, 10, 12); ctx.font = `10px ${FONT}`; ctx.fillText(c.cart.length, c.x + 13, c.y + 8); }
   if (c.bubble) drawBubble(c.x, c.y - 34, c.bubble, c.bubble === '!' ? '#ffd166' : '#fff');
   if (c.state === 'queue' || c.state === 'pick') {
@@ -1006,7 +1077,7 @@ function hud() {
   $('hDay').textContent = `${G.day}일차`;
   $('hClock').textContent = G.closed ? '마감 중' : `${hh}:${mm}`;
   $('hRev').textContent = won(G.revenue);
-  const net = G.revenue - G.cost - G.lost;
+  const net = G.revenue - G.cost - G.lost - G.wage;
   $('hNet').textContent = won(net); $('hNet').style.color = net < 0 ? 'var(--tag)' : '';
   const full = Math.round(G.rating);
   $('hStars').textContent = '★'.repeat(full) + '☆'.repeat(5 - full);
@@ -1017,6 +1088,7 @@ function hud() {
   const drunkFollow = G.customers.find(c => c.drunk && c.state === 'follow');
   let hint = G.mini ? '계산 중… 줄 선 손님들의 인내심이 줄고 있어요' : G.target ? G.target.label
     : drunkFollow ? '취객이 따라오는 중 · 천천히 입구까지 데려가세요 (너무 멀어지면 다시 돌아다녀요)' : carryHint;
+  if (!G.mini && G.up.cctv && G.customers.some(c => c.state === 'sneak')) hint = '<b style="color:var(--tag)">CCTV: 계산 안 한 손님이 출구로 향해요! 가로막으세요</b>';
   if (!G.mini && G.customers.some(c => c.state === 'flee')) hint = '<b style="color:var(--tag)">도둑이 출구로 도망간다! 달려가서 몸으로 막으세요 (Shift 달리기)</b>';
   if (hint !== lastHint) { hintEl.innerHTML = hint; lastHint = hint; }
   // banner
@@ -1043,10 +1115,10 @@ function showTitle() {
   mode = 'title';
   screenEl.hidden = false;
   screenEl.innerHTML = `<div class="card">
-    <span class="tag">PROTOTYPE v0.2</span>
+    <span class="tag">PROTOTYPE v0.3</span>
     <h1>나는 편의점 점장이다</h1>
     <p>오늘부터 당신이 이 가게의 점장. 박스를 나르고, 바코드를 찍고, 도시락을 데우고,<br>쏟아진 음료를 닦고, 도둑을 잡으세요. 08:00부터 22:00까지, 약 3분 30초의 하루.</p>
-    <p>새로 들어온 일: 🚚 물류 입고 · 🛵 배달 주문 · 🍺 취객 응대</p>
+    <p>새로 들어온 일: 🚚 물류 입고 · 🛵 배달 주문 · 🍺 취객 응대 · 💰 마감 후 점포 투자</p>
     <button class="btn" id="startBtn" type="button">영업 시작</button>
     <p style="font-size:12px">키보드: WASD·방향키 이동 / E·Space 행동 / Shift 달리기 / Q 계산 멈추기 / P 일시정지</p>
   </div>`;
@@ -1074,11 +1146,11 @@ function endDay() {
   G.order = null; G.banner = null; hud();
   const drunks = G.customers.filter(c => c.drunk && c.state !== 'leave').length;
   if (drunks) { G.stats.drunkLeft = drunks; rate(-0.1 * drunks); }
-  const net = G.revenue - G.cost - G.lost;
+  const net = G.revenue - G.cost - G.lost - G.wage;
   const r = G.rating;
   const verdict = r >= 4.5 ? '본사: "전국 우수 점포 후보입니다!"' : r >= 3.5 ? '본사: "안정적인 하루였네요. 내일도 부탁해요."' : r >= 2.5 ? '본사: "음… 고객 불만이 조금 들어왔어요."' : '본사: "점장 교육을 다시 받으셔야겠습니다."';
   const s = G.stats;
-  savedDay = { day: G.day + 1, rating: G.rating, bank: G.bank + net };
+  savedDay = { day: G.day + 1, rating: G.rating, bank: G.bank + net, up: { ...G.up } };
   screenEl.hidden = false;
   screenEl.innerHTML = `<div class="card">
     <span class="tag">${G.day}일차 마감 정산</span>
@@ -1088,6 +1160,7 @@ function endDay() {
       <dt>매출</dt><dd>${won(G.revenue)}</dd>
       <dt>박스 원가</dt><dd>-${won(G.cost)}</dd>
       <dt>도난·거스름돈 손실</dt><dd>-${won(G.lost)}</dd>
+      ${G.wage ? `<dt>알바 일당</dt><dd>-${won(G.wage)}</dd>` : ''}
       <dt class="sum">오늘 순이익</dt><dd class="sum" style="color:${net < 0 ? 'var(--tag)' : 'var(--mint)'}">${won(net)}</dd>
       <dt>누적 통장</dt><dd>${won(savedDay.bank)}</dd>
       <dt>계산한 손님</dt><dd>${s.served}명</dd>
@@ -1097,13 +1170,32 @@ function endDay() {
       <dt>배달 완료 / 취소</dt><dd>${s.orders} / ${s.orderFail}</dd>
       <dt>물류 입고 (박스)</dt><dd>${s.ships}회 (${s.shipBoxes}개)</dd>
       <dt>취객 내보냄 / 마감까지 남음</dt><dd>${s.drunkOut} / ${s.drunkLeft}</dd>
+      ${G.up.clerk ? `<dt>알바가 계산한 손님</dt><dd>${s.clerkServed}명</dd>` : ''}
     </dl>
+    <div class="shop" id="shop"></div>
     <button class="btn" id="nextBtn" type="button">${savedDay.day}일차 영업 시작</button>
-    <p style="font-size:12px">날이 갈수록 손님이 많아지고 성격이 급해집니다. 재고와 평점은 이어집니다.</p>
+    <p style="font-size:12px">날이 갈수록 손님이 많아지고 성격이 급해집니다. 재고, 평점, 투자한 설비는 이어집니다.</p>
   </div>`;
+  renderShop();
   const keep = G;
   $('nextBtn').onclick = () => { startGame(savedDay); G.stock = keep.stock; G.free = keep.free; };
   $('nextBtn').focus();
+}
+function renderShop() {
+  const el = $('shop'); if (!el) return;
+  const bank = savedDay.bank, up = savedDay.up;
+  el.innerHTML = `<div class="shop-head"><b>점포 투자</b><span>통장 <b>${won(bank)}</b></span></div>`
+    + UPGRADES.map(u => {
+      const lv = up[u.id], max = u.costs.length, cost = u.costs[lv], done = lv >= max;
+      return `<div class="up${done ? ' owned' : ''}"><div class="up-txt"><b>${u.name}${max > 1 ? ` <small>Lv.${lv}/${max}</small>` : ''}</b><small>${u.desc}</small></div>
+        <button type="button" data-up="${u.id}" ${done || bank < cost ? 'disabled' : ''}>${done ? '보유 중' : won(cost)}</button></div>`;
+    }).join('');
+  el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
+    const u = UPGRADES.find(x => x.id === b.dataset.up), cost = u.costs[savedDay.up[u.id]];
+    if (cost === undefined || savedDay.bank < cost) return;
+    savedDay.bank -= cost; savedDay.up[u.id]++; SFX.coin();
+    renderShop();
+  });
 }
 
 // ---------- loop ----------
