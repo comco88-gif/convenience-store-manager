@@ -92,12 +92,52 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;touch-action:none
 .order .go{color:var(--sign);font-weight:700}
 .order .tbar{height:5px;background:var(--line);border-radius:3px;overflow:hidden}
 .order .tbar i{display:block;height:100%;background:var(--mint)}
-.pad{display:none;justify-content:space-between;align-items:center;gap:16px;user-select:none;-webkit-user-select:none}
+.pad{display:none;justify-content:space-between;align-items:center;gap:16px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 @media (pointer:coarse){.pad{display:flex}}
-.dpad{display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(3,54px);gap:4px}
+.stick{position:relative;width:150px;height:150px;flex:none;border-radius:50%;background:var(--panel);border:2px solid var(--line);touch-action:none}
+.stick .ar{position:absolute;color:var(--muted);font-size:14px;pointer-events:none}
+.stick .u{top:8px;left:50%;transform:translateX(-50%)}.stick .d{bottom:8px;left:50%;transform:translateX(-50%)}
+.stick .l{left:10px;top:50%;transform:translateY(-50%)}.stick .r{right:10px;top:50%;transform:translateY(-50%)}
+.knob{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;background:var(--line);border:2px solid var(--muted);pointer-events:none}
 .pad button{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:10px;font-size:20px;font-weight:700;touch-action:none}
 .pad button:active,.pad button.on{background:var(--line)}
-.dpad [data-k=up]{grid-column:2;grid-row:1}.dpad [data-k=left]{grid-column:1;grid-row:2}.dpad [data-k=right]{grid-column:3;grid-row:2}.dpad [data-k=down]{grid-column:2;grid-row:3}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.hbtns{display:flex;gap:6px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;min-width:0;background:var(--night);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 6px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.seg button small{font-size:10px;font-weight:400;color:var(--muted);text-align:center}
+.seg button.on{border-color:var(--sign);background:#3a3218;color:var(--sign)}
+.up button.hired{background:none;border:1px solid var(--mint);color:var(--mint)}
+.shop .note{margin:0;font-size:11px;color:var(--muted)}
+.mcancel{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+/* phones: overlays use the whole screen, checkout panel floats at the top */
+@media (pointer:coarse),(max-width:700px){
+  .screen{position:fixed;z-index:30;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+  .mini{position:fixed;z-index:20;top:calc(env(safe-area-inset-top,0px) + 6px);max-height:62dvh;padding:10px 12px;gap:8px}
+  .item{flex-basis:80px;padding:6px}
+  .item .ic{font-size:20px}
+  .item .key{font-size:20px}
+  .hud{gap:4px 12px;padding:6px 10px}
+  .hud .brand{font-size:15px}
+  .hud .stat b{font-size:13px}
+}
+@media (pointer:coarse) and (orientation:portrait){.app .help{display:none}}
+/* phone held sideways: stick | game | buttons */
+@media (pointer:coarse) and (orientation:landscape){
+  body{padding-block:4px}
+  .app{max-width:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"hud hud hud" "stick stage btns" "hint hint hint";gap:4px 12px;align-items:center}
+  .hud{grid-area:hud}
+  .hud .brand{display:none}
+  .stage{grid-area:stage;justify-self:center;width:min(100%,calc((100dvh - 96px) * 1.6))}
+  .hint{grid-area:hint;min-height:0;font-size:12px}
+  .pad{display:contents}
+  .stick{grid-area:stick;width:130px;height:130px}
+  .mini{width:min(560px,calc(100vw - 340px));max-height:calc(100dvh - 12px)}
+  .app .abtns{grid-area:btns;flex-direction:column;align-items:center}
+  .app .abtns button{width:64px;height:64px;font-size:13px}
+  .app .abtns [data-k=action]{width:80px;height:80px}
+  .app .help{display:none}
+}
 .abtns{display:flex;gap:10px;align-items:flex-end}
 .abtns button{width:76px;height:76px;border-radius:50%;font-size:15px}
 .abtns [data-k=action]{background:var(--sign);color:#2a1a00;border:0;width:88px;height:88px}
@@ -117,7 +157,7 @@ kbd{font-family:inherit;font-size:11px;background:var(--night);border:1px solid 
     <div class="stat"><small>순이익</small><b id="hNet">0원</b></div>
     <div class="stat"><small>평점</small><b><span class="stars" id="hStars">★★★☆☆</span> <span id="hRate">3.0</span></b></div>
     <div class="stat"><small>체력</small><div class="stam"><i id="hStam" style="width:100%"></i></div></div>
-    <button id="muteBtn" type="button">소리 켜짐</button>
+    <div class="hbtns"><button id="pauseBtn" type="button">일시정지</button><button id="muteBtn" type="button">소리 켜짐</button></div>
   </header>
 
   <div class="stage" id="stage">
@@ -130,9 +170,8 @@ kbd{font-family:inherit;font-size:11px;background:var(--night);border:1px solid 
   <div class="hint" id="hint"></div>
 
   <div class="pad" id="pad">
-    <div class="dpad">
-      <button type="button" data-k="up">▲</button><button type="button" data-k="left">◀</button>
-      <button type="button" data-k="right">▶</button><button type="button" data-k="down">▼</button>
+    <div class="stick" id="stick" role="group" aria-label="이동 패드">
+      <span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◀</span><span class="ar r">▶</span><i class="knob" id="knob"></i>
     </div>
     <div class="abtns">
       <button type="button" data-k="dash">달리기</button>
@@ -145,7 +184,8 @@ kbd{font-family:inherit;font-size:11px;background:var(--night);border:1px solid 
     <div><b>창고</b>에서 박스를 꺼내 같은 종류 <b>선반</b>에 진열하세요. 품절이면 손님이 화를 냅니다.</div>
     <div><b>계산대</b>에서 방향키로 바코드 스캔, 전자레인지 타이밍, 거스름돈 계산. <kbd>Q</kbd>로 계산을 멈추고 도둑을 쫓을 수 있어요.</div>
     <div><b>도둑</b>은 평범한 손님처럼 들어와요. 물건 앞에서 두리번거리다 계산대가 아니라 <b>출구로 슬금슬금</b> 가면 의심하세요. 가까이 가면 <b style="color:var(--tag)">!</b>를 띄우고 달아나요. 몸으로 막아서 잡으세요.</div>
-    <div><b>점포 투자</b> · 마감 정산 화면에서 번 돈으로 운동화, 대용량 박스, 선반 확장, 고속 스캐너, CCTV, 알바를 살 수 있어요.</div>
+    <div><b>난이도와 알바</b> · 시작 화면과 마감 정산 화면에서 난이도(쉬움·보통·어려움)를 고르고, 계산·진열·매장 알바를 고용할 수 있어요. 일당은 그날 순이익에서 빠져요.</div>
+    <div><b>점포 투자</b> · 마감 정산 화면에서 번 돈으로 운동화, 대용량 박스, 선반 확장, 고속 스캐너, CCTV를 살 수 있어요.</div>
     <div><b>돌발 이벤트</b> · 🚚 <b>물류 입고</b>: 입구 박스를 창고의 같은 칸에 넣으면 무료 박스로 적립. 🛵 <b>배달 주문</b>: 선반을 돌며 담아 라이더에게. 🍺 <b>취객</b>: E로 달래서 입구까지 데리고 나가세요.</div>
   </section>
 </div>
@@ -162,15 +202,25 @@ const NAME = { dosirak: '도시락', ramen: '라면', snack: '과자', drink: '�
 const ICON = { dosirak: '🍱', ramen: '🍜', snack: '🍪', drink: '🥤' };
 const PRICE = { dosirak: 4500, ramen: 1500, snack: 1800, drink: 1600 };
 let MAXSTOCK = 12, BOX = 8; // set per day from upgrades
-const WHOLESALE = 0.55, CLERK_WAGE = 20000;
+const WHOLESALE = 0.55;
+// hard = original v0.3 tuning; lower levels slow customers, soften penalties, stretch event timers
+const DIFF = {
+  easy: { name: '쉬움', desc: '손님이 여유롭고 실수에 너그러워요', spawn: 1.5, drain: 0.55, penalty: 0.5, timer: 1.6, thief: 0.4, growth: 0.06 },
+  normal: { name: '보통', desc: '적당히 바쁜 하루', spawn: 1.2, drain: 0.8, penalty: 0.75, timer: 1.25, thief: 0.75, growth: 0.1 },
+  hard: { name: '어려움', desc: '쉴 틈 없는 러시', spawn: 1, drain: 1, penalty: 1, timer: 1, thief: 1, growth: 0.15 },
+};
+const STAFF = [
+  { id: 'cashier', name: '계산 알바', desc: '계산대를 비우면 4초에 한 명씩 대신 계산', wage: 15000 },
+  { id: 'stocker', name: '진열 알바', desc: '재고 3개 이하 선반을 채워요 (박스 원가는 들어요)', wage: 12000 },
+  { id: 'floor', name: '매장 알바', desc: '웅덩이 청소, 떨어진 물건 정리, 도둑 추격', wage: 12000 },
+];
+const NO_STAFF = () => Object.fromEntries(STAFF.map(s => [s.id, false]));
 const UPGRADES = [
   { id: 'shoes', name: '쿠션 운동화', desc: '이동 속도 +12% (단계마다)', costs: [30000, 60000] },
   { id: 'cart', name: '대용량 박스', desc: '박스 한 개에 8개 → 12개', costs: [40000] },
   { id: 'shelf', name: '선반 확장', desc: '선반 최대 진열 12개 → 16개', costs: [50000] },
   { id: 'scanner', name: '고속 스캐너', desc: '스캔 실수 멈춤이 짧고, 계산 중 손님 인내심이 거의 안 줄어요', costs: [35000] },
-  { id: 'cctv', name: 'CCTV', desc: '물건을 챙긴 도둑에게 빨간 표시, 출구로 향하면 알림', costs: [45000] },
-  { id: 'clerk', name: '알바 고용', desc: `계산대를 비우면 알바가 대신 계산 (매일 일당 ${CLERK_WAGE.toLocaleString('ko-KR')}원)`, costs: [25000] },
-];
+  { id: 'cctv', name: 'CCTV', desc: '물건을 챙긴 도둑에게 빨간 표시, 출구로 향하면 알림', costs: [45000] },];
 const NO_UPGRADES = () => Object.fromEntries(UPGRADES.map(u => [u.id, 0]));
 const SHELF = {
   dosirak: { x: 440, y: 20, w: 320, h: 45 },
@@ -245,13 +295,15 @@ const SFX = {
 document.getElementById('muteBtn').onclick = e => { muted = !muted; e.currentTarget.textContent = muted ? '소리 꺼짐' : '소리 켜짐'; };
 
 // ---------- state ----------
-let G = null, mode = 'title', savedDay = { day: 1, rating: 3, bank: 0, up: NO_UPGRADES() };
+let G = null, mode = 'title', savedDay = { day: 1, rating: 3, bank: 0, up: NO_UPGRADES(), staff: NO_STAFF(), diff: 'easy' };
 function newDay(carry) {
   MAXSTOCK = carry.up.shelf ? 16 : 12;
   BOX = carry.up.cart ? 12 : 8;
   G = {
     day: carry.day, rating: carry.rating, bank: carry.bank,
-    up: carry.up, wage: carry.up.clerk ? CLERK_WAGE : 0, clerkT: 0,
+    up: { ...carry.up }, staff: { ...carry.staff }, diffKey: carry.diff, diff: DIFF[carry.diff],
+    wage: STAFF.reduce((s, st) => s + (carry.staff[st.id] ? st.wage : 0), 0), clerkT: 0,
+    helpers: makeHelpers(carry.staff),
     time: 8 * 60, closed: false, spawnT: 1.5,
     player: { x: 160, y: 230, face: 1, stam: 1, walk: 0 },
     carry: null, holdT: 0, target: null,
@@ -265,7 +317,7 @@ function newDay(carry) {
   };
 }
 function float(x, y, txt, col = '#fff') { G.floats.push({ x, y, txt, col, t: 0 }); }
-function rate(d) { G.rating = clamp(G.rating + d, 0, 5); }
+function rate(d) { G.rating = clamp(G.rating + (d < 0 ? d * G.diff.penalty : d), 0, 5); }
 
 // ---------- input ----------
 const held = {};
@@ -283,11 +335,45 @@ addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) held[k] = fals
 addEventListener('blur', () => { for (const k in held) held[k] = false; });
 document.querySelectorAll('.pad button').forEach(b => {
   const k = b.dataset.k;
-  const on = e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); b.classList.add('on'); if (!held[k]) { held[k] = true; press(k); } };
+  const on = e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ } b.classList.add('on'); if (!held[k]) { held[k] = true; press(k); } };
   const off = () => { b.classList.remove('on'); held[k] = false; };
   b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off);
   b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
 });
+// virtual joystick: 8 directions for walking, dominant axis only during checkout scans
+const stick = document.getElementById('stick'), knob = document.getElementById('knob');
+let stickId = null;
+function stickSet(e) {
+  const r = stick.getBoundingClientRect();
+  let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const m = Math.hypot(dx, dy), lim = r.width * 0.32;
+  if (m > lim) { dx = dx / m * lim; dy = dy / m * lim; }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  const want = { up: false, down: false, left: false, right: false };
+  if (m > r.width * 0.12) {
+    const cos = dx / Math.hypot(dx, dy), sin = dy / Math.hypot(dx, dy);
+    if (G && G.mini) {
+      if (Math.abs(cos) > Math.abs(sin)) want[cos > 0 ? 'right' : 'left'] = true; else want[sin > 0 ? 'down' : 'up'] = true;
+    } else {
+      if (cos > 0.38) want.right = true; if (cos < -0.38) want.left = true;
+      if (sin > 0.38) want.down = true; if (sin < -0.38) want.up = true;
+    }
+  }
+  for (const k in want) {
+    if (want[k] && !held[k]) { held[k] = true; press(k); }
+    else if (!want[k]) held[k] = false;
+  }
+}
+function stickEnd(e) {
+  if (e.pointerId !== stickId) return;
+  stickId = null; knob.style.transform = '';
+  held.up = held.down = held.left = held.right = false;
+}
+const capture = (el, id) => { try { el.setPointerCapture(id); } catch (err) { /* pointer already gone */ } };
+stick.addEventListener('pointerdown', e => { e.preventDefault(); stickId = e.pointerId; capture(stick, e.pointerId); stickSet(e); });
+stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickSet(e); });
+stick.addEventListener('pointerup', stickEnd); stick.addEventListener('pointercancel', stickEnd);
+document.getElementById('pauseBtn').onclick = () => { if (mode === 'play') pause(); };
 
 function press(k) {
   if (mode === 'paused' && (k === 'pause' || k === 'action')) { resume(); return; }
@@ -380,7 +466,7 @@ function slotPos(i) { return [160 + i * 55, 368]; }
 function spawnCustomer() {
   const h = G.time / 60;
   const lunch = (h >= 11.5 && h < 13.5) || (h >= 17.5 && h < 20);
-  const thief = Math.random() < Math.min(0.2, 0.06 + 0.025 * G.day) && h > 10;
+  const thief = Math.random() < Math.min(0.2, 0.06 + 0.025 * G.day) * G.diff.thief && h > 10;
   const n = thief ? 1 + (Math.random() < 0.4 ? 1 : 0) : 1 + Math.floor(Math.random() * 3);
   const wants = [];
   for (let i = 0; i < n; i++) {
@@ -445,6 +531,50 @@ function clerkServe(c) {
   G.queue.splice(G.queue.indexOf(c), 1); c.atSlot = false; c.cart = []; c.bubble = '🙂';
   leaveStore(c, true);
 }
+
+// ---------- part-timers ----------
+function makeHelpers(staff) {
+  const npc = (x, y, node, shirt, label) => ({ x, y, node, path: [], direct: null, directNode: null, speed: 95, walk: 0, face: 1, stun: 0, state: 'helper', job: 'idle', t: 0, shirt, label });
+  return {
+    stocker: staff.stocker ? npc(400, 105, 'ul', '#ffe08a', '진열') : null,
+    floor: staff.floor ? npc(760, 470, 'lr', '#a8dadc', '매장') : null,
+  };
+}
+function updateStocker(n, dt) {
+  if (n.job === 'idle') {
+    const low = CATS.filter(c => G.stock[c] <= 3).sort((a, b) => G.stock[a] - G.stock[b])[0];
+    if (low) { n.job = 'go'; n.cat = low; n.path = bfs(n.node, 's_' + low); return; }
+    if (!n.path.length && n.node !== 'ul') n.path = bfs(n.node, 'ul');
+    follow(n, dt);
+  } else if (n.job === 'go') {
+    if (follow(n, dt)) { n.job = 'fill'; n.t = 0; }
+  } else if (n.job === 'fill' && (n.t += dt) >= 1.5) {
+    const add = Math.min(BOX, MAXSTOCK - G.stock[n.cat]);
+    if (add > 0) {
+      if (G.free[n.cat] > 0) G.free[n.cat]--;
+      else G.cost += Math.round(add * PRICE[n.cat] * WHOLESALE / 100) * 100;
+      G.stock[n.cat] += add;
+      float(n.x, n.y - 40, `알바가 ${NAME[n.cat]} 진열`, '#9fe8c9');
+    }
+    n.job = 'idle';
+  }
+}
+function updateFloor(n, dt) {
+  const thief = G.customers.find(c => c.state === 'sneak' || c.state === 'flee');
+  if (thief) {
+    stepTo(n, thief.x, thief.y, n.speed * 1.3, dt);
+    if (dist(n.x, n.y, thief.x, thief.y) < 30) { caught(thief); float(n.x, n.y - 44, '알바가 도둑을 잡았다!', '#ffd166'); }
+    return;
+  }
+  const tgt = n.tgt && (G.puddles.includes(n.tgt) || G.drops.includes(n.tgt)) ? n.tgt : [...G.puddles, ...G.drops][0];
+  if (tgt !== n.tgt) { n.tgt = tgt; n.t = 0; }
+  if (!tgt) { stepTo(n, 760, 470, n.speed, dt); return; }
+  if (!stepTo(n, tgt.x, tgt.y, n.speed, dt)) return;
+  if ((n.t += dt) < (tgt.r ? 2 : 0.6)) return;
+  if (tgt.r) { G.puddles.splice(G.puddles.indexOf(tgt), 1); G.stats.cleaned++; float(tgt.x, tgt.y - 20, '알바가 닦았어요', '#9fe8c9'); }
+  else { G.drops.splice(G.drops.indexOf(tgt), 1); if (G.stock[tgt.cat] < MAXSTOCK) G.stock[tgt.cat]++; }
+  n.tgt = null;
+}
 function spawnPuddle(x, y) {
   if (G.puddles.length >= 4) return;
   G.puddles.push({ x, y, r: rnd(20, 28), clean: 0, seed: Math.random() * 10 });
@@ -474,7 +604,7 @@ function showBanner(txt) { G.banner = { txt, t: 3.2 }; }
 function startShipment() {
   const n = Math.min(6, 3 + G.day), boxes = [];
   for (let i = 0; i < n; i++) boxes.push({ cat: pick(CATS), x: 575 + (i % 4) * 40, y: 522 + Math.floor(i / 4) * 34 });
-  const T = 45 + n * 6;
+  const T = (45 + n * 6) * G.diff.timer;
   G.ship = { boxes, t: T, T, late: false };
   showBanner('🚚 물류 트럭 도착! 입구 박스를 창고 칸으로 옮기세요'); SFX.alarm();
 }
@@ -488,7 +618,7 @@ function startOrder() {
   const n = 2 + Math.floor(Math.random() * (G.day >= 2 ? 3 : 2)), items = [];
   for (let i = 0; i < n; i++) items.push({ cat: pick(CATS), got: false });
   items.sort((a, b) => CATS.indexOf(a.cat) - CATS.indexOf(b.cat));
-  const T = Math.max(35, 60 - G.day * 3) + n * 4;
+  const T = (Math.max(35, 60 - G.day * 3) + n * 4) * G.diff.timer;
   G.order = { items, t: T, T, rider: { x: 885, y: 545 } };
   showBanner('🛵 배달앱 주문 접수! 선반을 돌며 담아서 라이더에게'); SFX.alarm();
 }
@@ -530,7 +660,7 @@ function escort(c) {
   float(c.x, c.y - 44, pick(['어~ 점장님~ 어디 가요~', '한 잔만 더~', '알았어 알았어~']), '#e0c3ff'); SFX.tick();
 }
 function updateCustomer(c, dt) {
-  const drain = 2.8 * (1 + 0.12 * (G.day - 1));
+  const drain = 2.8 * G.diff.drain * (1 + G.diff.growth * 0.8 * (G.day - 1));
   switch (c.state) {
     case 'shop': {
       if (c.wi >= c.wants.length) {
@@ -750,7 +880,8 @@ function renderMini(shake) {
   miniEl.className = 'mini' + (shake ? ' shake' : '');
   miniEl.innerHTML = `<div id="malarm"></div>
     <div class="mhead"><span>손님: "${c.line}"</span><div class="pbar"><i id="mpat"></i></div></div>
-    ${body}<div class="mfoot"><span>Q: 계산 멈추기</span><span>합계 <b>${won(total)}</b></span></div>`;
+    ${body}<div class="mfoot"><button type="button" class="mcancel" data-cancel>계산 멈추기 (Q)</button><span>합계 <b>${won(total)}</b></span></div>`;
+  miniEl.querySelector('[data-cancel]').onclick = () => { G.mini = null; renderMini(); };
   miniEl.querySelectorAll('[data-opt]').forEach(b => b.onclick = () => { if (G.mini && G.mini.lock <= 0) chooseChange(+b.dataset.opt); });
   updateMiniLive();
 }
@@ -774,8 +905,8 @@ function update(dt) {
     if (G.spawnT <= 0) {
       const h = G.time / 60;
       const rush = (h >= 11.5 && h < 13.5) || (h >= 17.5 && h < 20);
-      const base = (rush ? 2.4 : 5.2) / (1 + 0.15 * (G.day - 1));
-      G.spawnT = base * rnd(0.7, 1.3);
+      const base = (rush ? 2.4 : 5.2) / (1 + G.diff.growth * (G.day - 1));
+      G.spawnT = base * G.diff.spawn * rnd(0.7, 1.3);
       if (G.customers.length < 12) spawnCustomer();
     }
   }
@@ -823,12 +954,14 @@ function update(dt) {
     if (t.pd.clean >= 1.1) { G.puddles.splice(G.puddles.indexOf(t.pd), 1); G.stats.cleaned++; rate(0.02); float(t.pd.x, t.pd.y - 20, '반짝반짝!', '#9fe8c9'); SFX.good(); }
   } else G.holdT = 0;
   // part-timer covers the register while the player is away from it
-  if (G.up.clerk && !G.mini) {
+  if (G.staff.cashier && !G.mini) {
     const h = G.queue[0];
     if (h && h.atSlot && dist(p.x, p.y, ...POS_SPOT) > 60) {
-      if ((G.clerkT += dt) >= 6) { G.clerkT = 0; clerkServe(h); }
+      if ((G.clerkT += dt) >= 4) { G.clerkT = 0; clerkServe(h); }
     } else G.clerkT = 0;
   }
+  if (G.helpers.stocker) updateStocker(G.helpers.stocker, dt);
+  if (G.helpers.floor) updateFloor(G.helpers.floor, dt);
   // customers
   G.customers.forEach(c => updateCustomer(c, dt));
   G.customers = G.customers.filter(c => !c.dead);
@@ -941,13 +1074,25 @@ function drawCounter() {
   ctx.fillStyle = G.queue[0] && G.queue[0].atSlot ? '#4fd1a5' : '#6f8b98'; ctx.fillRect(145, 288, 34, 14);
   ctx.fillStyle = '#ef4f4f'; ctx.fillRect(196, 300, 12, 8);
   ctx.fillStyle = '#33444d'; ctx.font = `700 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('계산대', 125, 345);
-  if (G.up.clerk) {
+  if (G.staff.cashier) {
     drawPerson(222, 258, { shirt: '#f5f5f0', skin: '#e0ac7e', hair: '#5a3a22', walk: 0, face: -1, apron: true });
-    ctx.fillStyle = '#33444d'; ctx.font = `700 9px ${FONT}`; ctx.fillText('알바', 222, 286);
+    ctx.fillStyle = '#33444d'; ctx.font = `700 9px ${FONT}`; ctx.fillText('계산 알바', 222, 286);
     if (G.clerkT > 0) {
       ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3; ctx.beginPath();
-      ctx.arc(222, 254, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (G.clerkT / 6)); ctx.stroke();
+      ctx.arc(222, 254, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (G.clerkT / 4)); ctx.stroke();
     }
+  }
+}
+function drawHelper(n) {
+  drawPerson(n.x, n.y, { shirt: n.shirt, skin: '#f0c49a', hair: '#3a2a20', walk: n.walk, face: n.face, apron: true });
+  ctx.fillStyle = '#1b2a33'; ctx.font = `700 9px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(`${n.label} 알바`, n.x, n.y + 26);
+  if (n.job === 'go' || n.job === 'fill') {
+    ctx.fillStyle = '#c28b4e'; rr(n.x - 11, n.y - 46, 22, 16, 3); ctx.fill();
+    ctx.font = `11px ${FONT}`; ctx.fillText(ICON[n.cat], n.x, n.y - 34);
+  }
+  if (n.tgt && n.t > 0) {
+    ctx.strokeStyle = '#9fe8c9'; ctx.lineWidth = 3; ctx.beginPath();
+    ctx.arc(n.x, n.y, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(n.t / (n.tgt.r ? 2 : 0.6), 0, 1)); ctx.stroke();
   }
 }
 function drawPerson(x, y, o) {
@@ -1053,6 +1198,7 @@ function draw() {
   }
   const ents = [...G.customers.map(c => ({ y: c.y, f: () => drawCustomer(c) })), { y: G.player.y, f: drawPlayer }];
   if (G.order) ents.push({ y: G.order.rider.y, f: () => drawRider(G.order) });
+  for (const n of Object.values(G.helpers)) if (n) ents.push({ y: n.y, f: () => drawHelper(n) });
   ents.sort((a, b) => a.y - b.y).forEach(e => e.f());
   // floats
   ctx.textAlign = 'center';
@@ -1071,6 +1217,7 @@ function draw() {
 // ---------- HUD ----------
 const $ = id => document.getElementById(id);
 const hintEl = $('hint');
+const TOUCH = matchMedia('(pointer:coarse)').matches;
 let lastHint = '';
 function hud() {
   const m = Math.floor(G.time), hh = String(Math.floor(m / 60)).padStart(2, '0'), mm = String(Math.floor(m % 60 / 10) * 10).padStart(2, '0');
@@ -1090,6 +1237,7 @@ function hud() {
     : drunkFollow ? '취객이 따라오는 중 · 천천히 입구까지 데려가세요 (너무 멀어지면 다시 돌아다녀요)' : carryHint;
   if (!G.mini && G.up.cctv && G.customers.some(c => c.state === 'sneak')) hint = '<b style="color:var(--tag)">CCTV: 계산 안 한 손님이 출구로 향해요! 가로막으세요</b>';
   if (!G.mini && G.customers.some(c => c.state === 'flee')) hint = '<b style="color:var(--tag)">도둑이 출구로 도망간다! 달려가서 몸으로 막으세요 (Shift 달리기)</b>';
+  if (TOUCH) hint = hint.replace(/\[E( 꾹)?\]/g, '[행동$1]').replace('(Shift 달리기)', '(달리기 버튼)');
   if (hint !== lastHint) { hintEl.innerHTML = hint; lastHint = hint; }
   // banner
   const btxt = G.banner ? G.banner.txt : '';
@@ -1115,15 +1263,29 @@ function showTitle() {
   mode = 'title';
   screenEl.hidden = false;
   screenEl.innerHTML = `<div class="card">
-    <span class="tag">PROTOTYPE v0.3</span>
+    <span class="tag">PROTOTYPE v0.4</span>
     <h1>나는 편의점 점장이다</h1>
     <p>오늘부터 당신이 이 가게의 점장. 박스를 나르고, 바코드를 찍고, 도시락을 데우고,<br>쏟아진 음료를 닦고, 도둑을 잡으세요. 08:00부터 22:00까지, 약 3분 30초의 하루.</p>
-    <p>새로 들어온 일: 🚚 물류 입고 · 🛵 배달 주문 · 🍺 취객 응대 · 💰 마감 후 점포 투자</p>
+    <div class="shop" id="setup"></div>
     <button class="btn" id="startBtn" type="button">영업 시작</button>
-    <p style="font-size:12px">키보드: WASD·방향키 이동 / E·Space 행동 / Shift 달리기 / Q 계산 멈추기 / P 일시정지</p>
+    <p style="font-size:12px" class="keys">키보드: WASD·방향키 이동 / E·Space 행동 / Shift 달리기 / Q 계산 멈추기 / P 일시정지<br>휴대폰: 왼쪽 패드로 이동, 오른쪽 버튼으로 행동·달리기 (가로 화면 추천)</p>
   </div>`;
+  renderSetup();
   $('startBtn').onclick = () => startGame(savedDay);
   $('startBtn').focus();
+}
+function renderSetup() {
+  const el = $('setup'); if (!el) return;
+  const sv = savedDay;
+  const wage = STAFF.reduce((s, st) => s + (sv.staff[st.id] ? st.wage : 0), 0);
+  el.innerHTML = `<div class="shop-head"><b>난이도</b></div>
+    <div class="seg">${Object.entries(DIFF).map(([k, d]) => `<button type="button" data-diff="${k}" class="${sv.diff === k ? 'on' : ''}" aria-pressed="${sv.diff === k}">${d.name}<small>${d.desc}</small></button>`).join('')}</div>
+    <div class="shop-head"><b>알바 고용</b><span>일당 합계 <b>${won(wage)}</b></span></div>
+    ${STAFF.map(st => `<div class="up${sv.staff[st.id] ? ' owned' : ''}"><div class="up-txt"><b>${st.name} <small>일당 ${won(st.wage)}</small></b><small>${st.desc}</small></div>
+      <button type="button" data-staff="${st.id}" class="${sv.staff[st.id] ? 'hired' : ''}" aria-pressed="${sv.staff[st.id]}">${sv.staff[st.id] ? '고용 중' : '고용'}</button></div>`).join('')}
+    <p class="note">일당은 그날 영업이 끝나면 순이익에서 빠져요. 다시 누르면 내보낼 수 있어요.</p>`;
+  el.querySelectorAll('[data-diff]').forEach(b => b.onclick = () => { sv.diff = b.dataset.diff; renderSetup(); });
+  el.querySelectorAll('[data-staff]').forEach(b => b.onclick = () => { sv.staff[b.dataset.staff] = !sv.staff[b.dataset.staff]; renderSetup(); });
 }
 function startGame(carry) {
   if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
@@ -1150,7 +1312,7 @@ function endDay() {
   const r = G.rating;
   const verdict = r >= 4.5 ? '본사: "전국 우수 점포 후보입니다!"' : r >= 3.5 ? '본사: "안정적인 하루였네요. 내일도 부탁해요."' : r >= 2.5 ? '본사: "음… 고객 불만이 조금 들어왔어요."' : '본사: "점장 교육을 다시 받으셔야겠습니다."';
   const s = G.stats;
-  savedDay = { day: G.day + 1, rating: G.rating, bank: G.bank + net, up: { ...G.up } };
+  savedDay = { day: G.day + 1, rating: G.rating, bank: G.bank + net, up: { ...G.up }, staff: { ...G.staff }, diff: G.diffKey };
   screenEl.hidden = false;
   screenEl.innerHTML = `<div class="card">
     <span class="tag">${G.day}일차 마감 정산</span>
@@ -1170,13 +1332,14 @@ function endDay() {
       <dt>배달 완료 / 취소</dt><dd>${s.orders} / ${s.orderFail}</dd>
       <dt>물류 입고 (박스)</dt><dd>${s.ships}회 (${s.shipBoxes}개)</dd>
       <dt>취객 내보냄 / 마감까지 남음</dt><dd>${s.drunkOut} / ${s.drunkLeft}</dd>
-      ${G.up.clerk ? `<dt>알바가 계산한 손님</dt><dd>${s.clerkServed}명</dd>` : ''}
+      ${G.staff.cashier ? `<dt>알바가 계산한 손님</dt><dd>${s.clerkServed}명</dd>` : ''}
     </dl>
     <div class="shop" id="shop"></div>
+    <div class="shop" id="setup"></div>
     <button class="btn" id="nextBtn" type="button">${savedDay.day}일차 영업 시작</button>
     <p style="font-size:12px">날이 갈수록 손님이 많아지고 성격이 급해집니다. 재고, 평점, 투자한 설비는 이어집니다.</p>
   </div>`;
-  renderShop();
+  renderShop(); renderSetup();
   const keep = G;
   $('nextBtn').onclick = () => { startGame(savedDay); G.stock = keep.stock; G.free = keep.free; };
   $('nextBtn').focus();
