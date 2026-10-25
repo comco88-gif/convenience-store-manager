@@ -4,7 +4,9 @@
 
 ## 바로 플레이
 
-저장소를 받은 뒤 `index.html`을 브라우저로 열면 바로 실행됩니다.
+**https://comco88-gif.github.io/convenience-store-manager/**
+
+설치나 로그인 없이 PC·휴대폰 브라우저에서 바로 열립니다. `main` 브랜치에 push하면 1~2분 뒤 자동으로 반영됩니다. 저장소를 받은 뒤 `index.html`을 브라우저로 직접 열어도 됩니다.
 
 ## 조작
 

@@ -11,6 +11,7 @@
 - `index.html` 한 파일에 HTML/CSS/JS 전부. 빌드 도구 없음. Canvas 960×600 논리 좌표.
 - 외부 의존성은 Google Fonts(Black Han Sans, Noto Sans KR)뿐.
 - 로컬 실행: `powershell -ExecutionPolicy Bypass -File tools/serve.ps1` → http://localhost:8765
+- 공개 저장소. GitHub Pages(main 브랜치 루트)로 배포: https://comco88-gif.github.io/convenience-store-manager/ — main에 push하면 자동 반영.
 - claude.ai 아티팩트(https://claude.ai/artifact/7NCDHguvmJf2LrhwxR6bBb)도 함께 갱신한다. `index.html`에서 doctype/html/head/body 래퍼 줄을 뺀 사본을 `.artifact/convenience-manager.html`(git 제외)에 만들어 이 URL로 publish.
 
 ## 현재 구현 (v0.2)
