@@ -274,6 +274,7 @@ function bfs(a, b) {
 }
 const LINES = ['이거 계산이요', '빨리 좀 부탁해요', '봉투는 괜찮아요', '안녕하세요~', '포인트 적립 안 해요', '영수증은 버려주세요'];
 const SHIRTS = ['#e76f51', '#457b9d', '#e9c46a', '#8d6cab', '#f4a3b4', '#5aa469', '#d1d5db', '#c2703d'];
+const PANTS = ['#34495e', '#2d3436', '#5b6c8f', '#6d4c41', '#3d5a4c'];
 const SKINS = ['#f2c9a0', '#e0ac7e', '#c68b5e', '#f6d5b8'];
 const ARW = { up: '↑', down: '↓', left: '←', right: '→' };
 const won = n => n.toLocaleString('ko-KR') + '원';
@@ -354,12 +355,15 @@ function newDay(carry) {
     customers: [], queue: [], puddles: [], floats: [],
     mini: null, revenue: 0, cost: 0, lost: 0,
     free: { ...carry.free },
-    drops: [], ship: null, order: null, events: makeEvents(carry.day), banner: null,
+    drops: [], fx: [], shake: 0, ship: null, order: null, events: makeEvents(carry.day), banner: null,
     stats: { served: 0, angry: 0, caught: 0, stolen: 0, slips: 0, cleaned: 0,
       orders: 0, orderFail: 0, ships: 0, shipBoxes: 0, drunkOut: 0, drunkLeft: 0, clerkServed: 0 },
   };
 }
 function float(x, y, txt, col = '#fff') { G.floats.push({ x, y, txt, col, t: 0 }); }
+function burst(x, y, col, n = 8, pow = 1) {
+  for (let i = 0; i < n; i++) G.fx.push({ x, y, z: 24, vx: rnd(-70, 70) * pow, vy: rnd(-40, 40) * pow, vz: rnd(80, 170) * pow, col, t: 0, life: rnd(0.5, 0.9) });
+}
 function rate(d) { G.rating = clamp(G.rating + (d < 0 ? d * G.diff.penalty : d), 0, 5); }
 
 // ---------- input ----------
@@ -540,7 +544,7 @@ function spawnCustomer() {
   const [x, y] = NODES.door;
   G.customers.push({
     x, y: y + 30, node: 'door', path: [], direct: null, state: 'shop', wants, wi: 0, cart: [], thief,
-    patience: 100, speed: rnd(75, 100), shirt: pick(SHIRTS), skin: pick(SKINS),
+    patience: 100, speed: rnd(75, 100), shirt: pick(SHIRTS), pants: pick(PANTS), skin: pick(SKINS),
     cap: Math.random() < (thief ? 0.6 : 0.15), lookT: 0,
     hair: pick(['#2b1d14', '#4a3222', '#111', '#7a5230']), bubble: null, waitT: 0, stun: 0, slipped: new Set(),
     wantHeat: Math.random() < 0.6, line: pick(LINES), walk: Math.random() * 6, face: -1,
@@ -583,14 +587,14 @@ function caught(c) {
   G.stats.caught++; rate(0.15);
   c.cart.forEach(cat => { if (G.stock[cat] < MAXSTOCK) G.stock[cat]++; });
   c.cart = []; c.thief = false; c.bubble = '😰'; c.speed *= 0.7; c.stun = 0.8;
-  float(c.x, c.y - 44, '도둑 검거! 물건 회수', '#ffd166'); SFX.good();
+  float(c.x, c.y - 44, '도둑 검거! 물건 회수', '#ffd166'); SFX.good(); burst(c.x, c.y, '#ffd166', 14, 1.2); G.shake = 0.35;
   c.state = 'leave';
   if (!c.path.length) c.path = bfs(c.node, 'door');
 }
 function clerkServe(c) {
   const total = cartTotal(c);
   G.revenue += total; G.stats.served++; G.stats.clerkServed++; rate(0.03);
-  float(c.x, c.y - 44, `알바 계산 +${won(total)}`, '#ffd166'); SFX.coin();
+  float(c.x, c.y - 44, `알바 계산 +${won(total)}`, '#ffd166'); SFX.coin(); burst(c.x, c.y, '#ffd166', 6);
   G.queue.splice(G.queue.indexOf(c), 1); c.atSlot = false; c.cart = []; c.bubble = '🙂';
   leaveStore(c, true);
 }
@@ -622,26 +626,49 @@ function updateStocker(n, dt) {
     n.job = 'idle';
   }
 }
+// helpers go straight only when nothing is in the way; otherwise they take the aisle graph like customers
+function clearLine(ax, ay, bx, by) {
+  const k = Math.ceil(dist(ax, ay, bx, by) / 10);
+  for (let i = 1; i <= k; i++) {
+    const x = ax + (bx - ax) * i / k, y = ay + (by - ay) * i / k;
+    if (OBST.some(o => distRect(x, y, o) < 12)) return false;
+  }
+  return true;
+}
+function seenNode(x, y) {
+  const ks = Object.keys(NODES).sort((a, b) => dist(x, y, ...NODES[a]) - dist(x, y, ...NODES[b]));
+  return ks.find(k => clearLine(x, y, ...NODES[k])) || ks[0];
+}
+function navTo(n, tx, ty, sp, dt) {
+  tx = clamp(tx, 34, 926); ty = clamp(ty, 34, 566);
+  if (clearLine(n.x, n.y, tx, ty)) { n.route = null; return stepTo(n, tx, ty, sp, dt); }
+  const goal = seenNode(tx, ty);
+  if (!n.route || n.routeGoal !== goal) { const start = seenNode(n.x, n.y); n.route = [start, ...bfs(start, goal)]; n.routeGoal = goal; }
+  if (!n.route.length) return stepTo(n, tx, ty, sp, dt);
+  if (stepTo(n, ...NODES[n.route[0]], sp, dt)) n.route.shift();
+  return false;
+}
+const onFloor = (x, y) => x > 34 && x < 926 && y > 34 && y < 566 && !OBST.some(o => distRect(x, y, o) < 10);
 function updateFloor(n, dt) {
   const thief = G.customers.find(c => c.state === 'sneak' || c.state === 'flee');
   if (thief) {
-    stepTo(n, thief.x, thief.y, n.speed * 1.3, dt);
+    navTo(n, thief.x, thief.y, n.speed * 1.3, dt);
     if (dist(n.x, n.y, thief.x, thief.y) < 30) { caught(thief); float(n.x, n.y - 44, '알바가 도둑을 잡았다!', '#ffd166'); }
     return;
   }
   const tgt = n.tgt && (G.puddles.includes(n.tgt) || G.drops.includes(n.tgt)) ? n.tgt : [...G.puddles, ...G.drops][0];
   if (tgt !== n.tgt) { n.tgt = tgt; n.t = 0; }
-  if (!tgt) { stepTo(n, 760, 470, n.speed, dt); return; }
-  if (!stepTo(n, tgt.x, tgt.y, n.speed, dt)) return;
+  if (!tgt) { navTo(n, 760, 470, n.speed, dt); return; }
+  if (!navTo(n, tgt.x, tgt.y, n.speed, dt)) return;
   if ((n.t += dt) < (tgt.r ? 2 : 0.6)) return;
   if (tgt.r) { G.puddles.splice(G.puddles.indexOf(tgt), 1); G.stats.cleaned++; float(tgt.x, tgt.y - 20, '알바가 닦았어요', '#9fe8c9'); }
   else { G.drops.splice(G.drops.indexOf(tgt), 1); if (G.stock[tgt.cat] < MAXSTOCK) G.stock[tgt.cat]++; }
   n.tgt = null;
 }
 function spawnPuddle(x, y) {
-  if (G.puddles.length >= 4) return;
+  if (G.puddles.length >= 4 || !onFloor(x, y)) return;
   G.puddles.push({ x, y, r: rnd(20, 28), clean: 0, seed: Math.random() * 10 });
-  float(x, y - 20, '앗! 음료를 쏟았다', '#9ad7ff'); SFX.splash();
+  float(x, y - 20, '앗! 음료를 쏟았다', '#9ad7ff'); SFX.splash(); burst(x, y, '#7cc4f2', 8, 0.7);
 }
 
 // ---------- events: shipments, delivery orders, drunks ----------
@@ -694,7 +721,7 @@ function orderPick(cat) {
 function deliverOrder() {
   const o = G.order, total = o.items.reduce((s, i) => s + PRICE[i.cat], 0), fast = o.t > o.T / 2, tip = fast ? 1000 : 0;
   G.revenue += total + tip; G.stats.orders++; rate(fast ? 0.08 : 0.05);
-  float(o.rider.x - 40, o.rider.y - 50, `배달 완료 +${won(total + tip)}${tip ? ' (팁!)' : ''}`, '#ffd166'); SFX.coin();
+  float(o.rider.x - 40, o.rider.y - 50, `배달 완료 +${won(total + tip)}${tip ? ' (팁!)' : ''}`, '#ffd166'); SFX.coin(); burst(o.rider.x, o.rider.y, '#ffd166', 10);
   G.order = null;
 }
 function failOrder() {
@@ -774,7 +801,11 @@ function updateCustomer(c, dt) {
           const cat = c.node.startsWith('s_') ? c.node.slice(2) : null;
           if (cat && G.stock[cat] > 0 && Math.random() < 0.65) {
             const k = Math.min(G.stock[cat], Math.random() < 0.4 ? 2 : 1);
-            for (let i = 0; i < k; i++) { G.stock[cat]--; G.drops.push({ cat, x: c.x + rnd(-24, 24), y: c.y + rnd(14, 30), rot: rnd(-0.6, 0.6) }); }
+            for (let i = 0; i < k; i++) {
+              let x = c.x + rnd(-24, 24), y = c.y + rnd(14, 30);
+              if (!onFloor(x, y)) { x = c.x; y = c.y + 12; }
+              G.stock[cat]--; G.drops.push({ cat, x, y, rot: rnd(-0.6, 0.6) });
+            }
             float(c.x, c.y - 44, '와장창!', '#ffb4b4'); SFX.err();
           } else if (Math.random() < 0.3) spawnPuddle(c.x + rnd(-20, 20), c.y + rnd(16, 26));
           else float(c.x, c.y - 44, pick(['♪ 술이 술술~', '딸꾹!', '여기 노래방 아니에요?', '점장님 최고~']), '#e0c3ff');
@@ -807,7 +838,7 @@ function updateCustomer(c, dt) {
       const p = G.player, d = dist(p.x, p.y, c.x, c.y);
       if (d < 30) { caught(c); break; }
       if (d < 110 || c.node === 'lr' || c.node === 'door') {
-        c.state = 'flee'; c.bubble = '!'; SFX.alarm(); float(c.x, c.y - 44, '도둑이야!', '#ff6b6b');
+        c.state = 'flee'; c.bubble = '!'; SFX.alarm(); G.shake = Math.max(G.shake, 0.25); float(c.x, c.y - 44, '도둑이야!', '#ff6b6b');
         if (!c.path.length) c.path = bfs(c.node, 'door');
         break;
       }
@@ -819,7 +850,7 @@ function updateCustomer(c, dt) {
       const p = G.player;
       if (dist(p.x, p.y, c.x, c.y) < 30) { caught(c); break; }
       if (follow(c, dt) && c.node === 'door') {
-        c.dead = true; G.stats.stolen++;
+        c.dead = true; G.stats.stolen++; G.shake = 0.5;
         const loss = c.cart.reduce((s, k) => s + PRICE[k], 0);
         G.lost += loss; rate(-0.12);
         float(820, 520, `도둑맞았다… -${won(loss)}`, '#ff6b6b'); SFX.bad();
@@ -910,7 +941,7 @@ function finishCheckout() {
   if (m.burnt) d -= 0.08;
   if (m.wrongChange) d -= 0.15;
   rate(d);
-  float(c.x, c.y - 44, '+' + won(total), '#ffd166'); SFX.coin();
+  float(c.x, c.y - 44, '+' + won(total), '#ffd166'); SFX.coin(); burst(c.x, c.y, '#ffd166', 10);
   G.queue.splice(G.queue.indexOf(c), 1); c.atSlot = false; c.cart = [];
   c.bubble = d >= 0.1 ? '😊' : d > 0 ? '🙂' : '😒';
   leaveStore(c, true);
@@ -1014,7 +1045,7 @@ function update(dt) {
   } else if (held.action && t && t.type === 'clean') {
     t.pd.clean += dt;
     if (Math.random() < dt * 8) SFX.tick();
-    if (t.pd.clean >= 1.1) { G.puddles.splice(G.puddles.indexOf(t.pd), 1); G.stats.cleaned++; rate(0.02); float(t.pd.x, t.pd.y - 20, '반짝반짝!', '#9fe8c9'); SFX.good(); }
+    if (t.pd.clean >= 1.1) { G.puddles.splice(G.puddles.indexOf(t.pd), 1); G.stats.cleaned++; rate(0.02); float(t.pd.x, t.pd.y - 20, '반짝반짝!', '#9fe8c9'); SFX.good(); burst(t.pd.x, t.pd.y, '#ffffff', 10); }
   } else G.holdT = 0;
   // part-timer covers the register while the player is away from it
   if (G.staff.cashier && !G.mini) {
@@ -1029,252 +1060,493 @@ function update(dt) {
   G.customers.forEach(c => updateCustomer(c, dt));
   G.customers = G.customers.filter(c => !c.dead);
   G.floats.forEach(f => f.t += dt);
+  G.fx.forEach(f => { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt; f.vz -= 420 * dt; if (f.z < 0) { f.z = 0; f.vz *= -0.35; f.vx *= 0.6; f.vy *= 0.6; } });
+  G.fx = G.fx.filter(f => f.t < f.life);
+  G.shake = Math.max(0, G.shake - dt);
   G.floats = G.floats.filter(f => f.t < 1.6);
   if (G.mini) { G.mini.lock -= dt; G.mini.heatT += dt; G.mini.t += dt; if (G.mini && !G.queue.includes(G.mini.c)) { G.mini = null; renderMini(); } else updateMiniLive(); }
   if ((G.closed && !G.customers.some(c => !c.drunk) && !G.mini) || G.time >= 23 * 60) endDay();
 }
 
 // ---------- draw ----------
+// 2.5D view: the floor plane is squashed by SY under a back wall strip of height TOP; anything standing
+// (shelves, walls, people) rises straight up in screen space and leans slightly away from the centre.
+// Game logic keeps flat 960×600 floor coordinates; py() maps a floor y to the screen.
 const FONT = "'Noto Sans KR','Malgun Gothic',sans-serif";
+const TOP = 62, SY = 0.89, PERSP = 0.0008;
+const py = y => TOP + y * SY;
+const feet = y => py(y + 10);
+let shX = 0, shY = 0, doorT = 0;
+const GEO = {};
 function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
-function drawFloor() {
-  ctx.fillStyle = '#1b2a33'; ctx.fillRect(0, 0, W, H);
-  for (let y = 20; y < 580; y += 40) for (let x = 20; x < 940; x += 40) {
-    ctx.fillStyle = ((x + y) / 40) % 2 ? '#e9eee8' : '#dde4dc';
-    ctx.fillRect(x, y, 40, 40);
-  }
-  // storage room
-  ctx.fillStyle = '#b9ab95'; ctx.fillRect(20, 20, 340, 105);
-  ctx.strokeStyle = 'rgba(0,0,0,.08)';
-  for (let x = 20; x < 360; x += 34) { ctx.beginPath(); ctx.moveTo(x, 20); ctx.lineTo(x, 125); ctx.stroke(); }
-  ctx.fillStyle = '#41505a'; ctx.fillRect(20, 125, 280, 10); ctx.fillRect(360, 20, 10, 115);
-  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.font = `700 12px ${FONT}`; ctx.textAlign = 'left'; ctx.fillText('창고', 30, 116);
-  // checkout zone mat
-  ctx.fillStyle = '#c9d6cf'; ctx.fillRect(20, 135, 250, 155);
-  // entrance
-  ctx.fillStyle = '#7fb6c9'; ctx.fillRect(760, 576, 120, 8);
-  ctx.fillStyle = '#47565f'; ctx.fillRect(750, 572, 8, 12); ctx.fillRect(882, 572, 8, 12);
-  ctx.fillStyle = '#9aa69f'; rr(785, 540, 70, 30, 4); ctx.fill();
-  ctx.fillStyle = '#5d6a63'; ctx.font = `700 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('어서오세요', 820, 559);
-  // walls
-  ctx.fillStyle = '#41505a';
-  ctx.fillRect(0, 0, W, 20); ctx.fillRect(0, 580, 760, 20); ctx.fillRect(880, 580, 80, 20); ctx.fillRect(0, 0, 20, H); ctx.fillRect(940, 0, 20, H);
+function floorMode() { ctx.setTransform(DPR, 0, 0, DPR * SY, shX * DPR, (TOP + shY) * DPR); }
+function screenMode() { ctx.setTransform(DPR, 0, 0, DPR, shX * DPR, shY * DPR); }
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f))})`;
 }
-function drawShelf(cat) {
-  const s = SHELF[cat], st = G.stock[cat], vertical = s.h > s.w;
-  const fridge = cat === 'drink' || cat === 'dosirak';
-  ctx.fillStyle = fridge ? '#cfe3ea' : '#8a6a4f'; rr(s.x, s.y, s.w, s.h, 4); ctx.fill();
-  ctx.fillStyle = fridge ? '#a8c9d4' : '#6f533d'; rr(s.x + 4, s.y + 4, s.w - 8, s.h - 8, 3); ctx.fill();
-  ctx.font = `${MAXSTOCK > 12 ? 14 : 18}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  for (let i = 0; i < MAXSTOCK; i++) {
-    const fx = vertical ? s.x + s.w / 2 : s.x + 16 + i * ((s.w - 32) / (MAXSTOCK - 1));
-    const fy = vertical ? s.y + 16 + i * ((s.h - 32) / (MAXSTOCK - 1)) : s.y + s.h / 2;
-    if (i < st) ctx.fillText(ICON[cat], fx, fy);
-    else { ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(fx - 5, fy - 5, 10, 10); }
-  }
-  ctx.textBaseline = 'alphabetic';
-  // label tag
-  const lx = vertical ? s.x - 8 : s.x + s.w / 2, ly = vertical ? s.y - 8 : s.y + s.h + 14;
-  const empty = st === 0, blink = empty && Math.floor(performance.now() / 300) % 2;
-  const label = empty ? `${NAME[cat]} 품절!` : `${NAME[cat]} ${st}/${MAXSTOCK}`;
-  ctx.font = `700 11px ${FONT}`;
-  const tw = ctx.measureText(label).width + 12;
-  ctx.fillStyle = empty ? (blink ? '#ef4f4f' : '#b52f2f') : st <= 3 ? '#e8a33a' : '#ffd84d';
-  rr(lx - tw / 2 - (vertical ? tw / 2 - 20 : 0), ly - 11, tw, 16, 3); ctx.fill();
-  ctx.fillStyle = empty ? '#fff' : '#2a1a00';
-  ctx.fillText(label, lx - (vertical ? tw / 2 - 20 : 0), ly + 1);
+function mix(a, b, t) {
+  const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
+  return `rgb(${[16, 8, 0].map(s => Math.round(((A >> s) & 255) * (1 - t) + ((B >> s) & 255) * t))})`;
 }
-function drawCrate(cat) {
-  const c = CRATE[cat];
-  ctx.fillStyle = '#c28b4e'; rr(c.x, c.y, c.w, c.h, 3); ctx.fill();
-  ctx.strokeStyle = '#8e5f2c'; ctx.lineWidth = 2; ctx.strokeRect(c.x + 3, c.y + 3, c.w - 6, c.h - 6);
-  ctx.fillStyle = '#e9cfa0'; ctx.fillRect(c.x + c.w / 2 - 4, c.y, 8, c.h);
-  ctx.font = `16px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(ICON[cat], c.x + c.w / 2, c.y + 26);
-  ctx.fillStyle = '#3d2a14'; ctx.font = `700 10px ${FONT}`; ctx.fillText(NAME[cat], c.x + c.w / 2, c.y + c.h + 12);
-  if (G.free[cat] > 0) {
-    ctx.fillStyle = '#2f9e72'; rr(c.x + c.w - 22, c.y - 8, 30, 15, 7); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = `900 10px ${FONT}`; ctx.fillText(`+${G.free[cat]}`, c.x + c.w - 7, c.y + 3);
-  }
+function poly(pts, fill) {
+  ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
 }
-function drawDrop(d) {
-  ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot);
-  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(0, 6, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.font = `16px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(ICON[d.cat], 0, 5);
+function ellipse(x, y, rx, ry, fill) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); }
+// a box standing on the floor: footprint r, height z. Returns face mappers (u along, v up, both 0..1) for decorating.
+function prism(r, z, col, opt = {}) {
+  const L = (r.x + r.w / 2 - W / 2) * z * PERSP;
+  const x0 = r.x, x1 = r.x + r.w, b0 = py(r.y), b1 = py(r.y + r.h), t0 = b0 - z, t1 = b1 - z, sx = L > 0 ? x0 : x1;
+  if (Math.abs(L) > 0.5) poly([[sx, b0], [sx, b1], [sx + L, t1], [sx + L, t0]], opt.side || shade(col, -0.35));
+  poly([[x0, b1], [x1, b1], [x1 + L, t1], [x0 + L, t1]], opt.front || shade(col, -0.18));
+  poly([[x0 + L, t0], [x1 + L, t0], [x1 + L, t1], [x0 + L, t1]], opt.top || col);
+  return {
+    x0, x1, b0, b1, t0, t1, L, z, w: r.w,
+    front: (u, v) => [x0 + u * r.w + v * L, b1 - v * z],
+    side: (u, v) => [sx + v * L, b0 + u * (b1 - b0) - v * z],
+    hull: L >= 0 ? [[x0, b1], [x1, b1], [x1 + L, t1], [x1 + L, t0], [x0 + L, t0], [x0, b0]]
+      : [[x0, b1], [x1, b1], [x1, b0], [x1 + L, t0], [x0 + L, t0], [x0 + L, t1]],
+  };
+}
+
+// product sprites, drawn rather than emoji so they look the same on every PC; (x, y) = bottom centre
+function drawItem(cat, x, y, s = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  if (cat === 'dosirak') {
+    ctx.fillStyle = '#2d2d2d'; rr(-10, -9, 20, 9, 2); ctx.fill();
+    ctx.fillStyle = '#f7f3e8'; rr(-9, -8, 9, 6, 1); ctx.fill();
+    ctx.fillStyle = '#e76f51'; ctx.fillRect(1, -8, 4, 3);
+    ctx.fillStyle = '#6ab04c'; ctx.fillRect(5, -8, 3, 3);
+    ctx.fillStyle = '#f4d35e'; ctx.fillRect(1, -5, 7, 3);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(-10, -9, 20, 2);
+  } else if (cat === 'ramen') {
+    poly([[-7, -14], [7, -14], [5, 0], [-5, 0]], '#d62828');
+    ctx.fillStyle = '#fff'; ctx.fillRect(-6.2, -10, 12.4, 3.5);
+    ctx.fillStyle = '#f4a261'; ctx.fillRect(-2, -9.5, 4, 2.5);
+    ctx.fillStyle = '#f2f2f2'; ctx.fillRect(-7.5, -15.5, 15, 2.5);
+  } else if (cat === 'snack') {
+    ctx.fillStyle = '#f4a020'; rr(-7, -16, 14, 16, 3); ctx.fill();
+    ctx.fillStyle = '#c97c0a'; ctx.fillRect(-7, -16, 14, 2); ctx.fillRect(-7, -2, 14, 2);
+    ellipse(0, -8, 3.5, 3.5, '#fff3c4');
+    ctx.fillStyle = '#c0392b'; ctx.fillRect(-4, -13, 8, 1.6);
+  } else {
+    ctx.fillStyle = '#5ec3e8'; rr(-4.5, -15, 9, 15, 3); ctx.fill(); ctx.fillRect(-2.5, -18, 5, 4);
+    ctx.fillStyle = '#e63946'; ctx.fillRect(-3, -20, 6, 2.5);
+    ctx.fillStyle = '#fff'; ctx.fillRect(-4.5, -10, 9, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(-3, -14, 1.5, 12);
+  }
   ctx.restore();
 }
-function drawShipment(s) {
-  ctx.fillStyle = s.late ? 'rgba(239,79,79,.18)' : 'rgba(255,194,61,.2)'; rr(552, 498, 166, 76, 6); ctx.fill();
-  const pct = clamp(s.t / s.T, 0, 1);
-  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(556, 502, 158, 5);
-  ctx.fillStyle = s.late ? '#ef4f4f' : pct < 0.3 ? '#f2b33d' : '#3cbf8a'; ctx.fillRect(556, 502, 158 * (s.late ? 1 : pct), 5);
-  s.boxes.forEach(b => {
-    ctx.fillStyle = '#c28b4e'; rr(b.x - 15, b.y - 12, 30, 24, 3); ctx.fill();
-    ctx.strokeStyle = '#8e5f2c'; ctx.lineWidth = 2; ctx.strokeRect(b.x - 12, b.y - 9, 24, 18);
-    ctx.font = `12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(ICON[b.cat], b.x, b.y + 5);
-  });
+const CAT_OF = Object.fromEntries(CATS.map(c => [ICON[c], c]));
+
+// ---- floor layer ----
+function lightLevel() { const h = G.time / 60; return h < 17 ? 0 : h < 20 ? (h - 17) / 3 : 1; }
+function drawFloor() {
+  floorMode();
+  ctx.fillStyle = '#1b2a33'; ctx.fillRect(0, 0, W, H);
+  for (let y = 20; y < 580; y += 40) for (let x = 20; x < 940; x += 40) {
+    ctx.fillStyle = ((x + y) / 40) % 2 ? '#eef1ea' : '#e0e6de';
+    ctx.fillRect(x, y, 40, 40);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  for (let y = 20; y < 580; y += 40) ctx.fillRect(20, y, 920, 1.2);
+  // storage room: bare concrete with hazard edge at the doorway
+  ctx.fillStyle = '#ab9f8b'; ctx.fillRect(20, 20, 340, 105);
+  ctx.fillStyle = 'rgba(0,0,0,.06)';
+  for (let x = 20; x < 360; x += 34) ctx.fillRect(x, 20, 1, 105);
+  for (let x = 300; x < 360; x += 12) { ctx.fillStyle = (x / 12) % 2 ? '#f2c230' : '#2b2b2b'; ctx.fillRect(x, 120, 12, 5); }
+  // checkout area mat and queue floor marks
+  ctx.fillStyle = '#c4d3cb'; rr(24, 139, 242, 147, 8); ctx.fill();
+  ctx.fillStyle = 'rgba(47,158,114,.25)';
+  for (let i = 0; i < 5; i++) { const [x, y] = slotPos(i); rr(x - 16, y - 2, 32, 22, 6); ctx.fill(); }
+  // entrance mat
+  ctx.fillStyle = '#52616a'; rr(772, 512, 96, 64, 6); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 2;
+  for (let x = 782; x < 864; x += 10) { ctx.beginPath(); ctx.moveTo(x, 518); ctx.lineTo(x, 570); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.font = `900 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('WELCOME', 820, 548);
+  // reflections of the ceiling lights
+  for (const [x, y] of LAMPS) {
+    const g = ctx.createRadialGradient(x, y, 4, x, y, 90);
+    g.addColorStop(0, 'rgba(255,255,255,.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(x - 90, y - 90, 180, 180);
+  }
+  if (G.ship) drawShipZone(G.ship);
+  G.puddles.forEach(drawPuddle);
 }
-function drawRider(o) {
-  const r = o.rider;
-  ctx.fillStyle = '#2b2d42'; rr(r.x - 34, r.y - 2, 26, 14, 5); ctx.fill();
-  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(r.x - 31, r.y + 12, 5, 0, Math.PI * 2); ctx.arc(r.x - 11, r.y + 12, 5, 0, Math.PI * 2); ctx.fill();
-  drawPerson(r.x, r.y, { shirt: '#2a9df4', skin: '#e0ac7e', hair: '#111', walk: 0, face: -1 });
-  ctx.fillStyle = '#e63946'; ctx.beginPath(); ctx.arc(r.x - 1.5, r.y - 15, 10, Math.PI, 0); ctx.fill();
-  const pct = clamp(o.t / o.T, 0, 1);
-  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.arc(r.x, r.y - 44, 13, 0, Math.PI * 2); ctx.stroke();
-  ctx.strokeStyle = pct < 0.3 ? '#ef4f4f' : '#4fd1a5'; ctx.beginPath(); ctx.arc(r.x, r.y - 44, 13, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct); ctx.stroke();
-  ctx.font = `13px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🛵', r.x, r.y - 44); ctx.textBaseline = 'alphabetic';
-}
-function drawCounter() {
-  const c = COUNTER;
-  ctx.fillStyle = '#56636b'; rr(c.x, c.y, c.w, c.h, 4); ctx.fill();
-  ctx.fillStyle = '#f2f2ee'; rr(c.x + 3, c.y + 3, c.w - 6, c.h - 10, 3); ctx.fill();
-  // microwave
-  ctx.fillStyle = '#3a3f44'; rr(30, 270, 50, 34, 3); ctx.fill();
-  ctx.fillStyle = G.mini && G.mini.phase === 'heat' ? '#ffcf5a' : '#6b7c87'; ctx.fillRect(35, 275, 32, 24);
-  ctx.fillStyle = '#9fe8c9'; ctx.fillRect(70, 278, 6, 4);
-  // POS
-  ctx.fillStyle = '#2e3a42'; rr(140, 284, 44, 26, 3); ctx.fill();
-  ctx.fillStyle = G.queue[0] && G.queue[0].atSlot ? '#4fd1a5' : '#6f8b98'; ctx.fillRect(145, 288, 34, 14);
-  ctx.fillStyle = '#ef4f4f'; ctx.fillRect(196, 300, 12, 8);
-  ctx.fillStyle = '#33444d'; ctx.font = `700 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('계산대', 125, 345);
-  if (G.staff.cashier) {
-    drawPerson(222, 258, { shirt: '#f5f5f0', skin: '#e0ac7e', hair: '#5a3a22', walk: 0, face: -1, apron: true });
-    ctx.fillStyle = '#33444d'; ctx.font = `700 9px ${FONT}`; ctx.fillText('계산 알바', 222, 286);
-    if (G.clerkT > 0) {
-      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3; ctx.beginPath();
-      ctx.arc(222, 254, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (G.clerkT / 4)); ctx.stroke();
-    }
-  }
-}
-function drawHelper(n) {
-  drawPerson(n.x, n.y, { shirt: n.shirt, skin: '#f0c49a', hair: '#3a2a20', walk: n.walk, face: n.face, apron: true });
-  ctx.fillStyle = '#1b2a33'; ctx.font = `700 9px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(`${n.label} 알바`, n.x, n.y + 26);
-  if (n.job === 'go' || n.job === 'fill') {
-    ctx.fillStyle = '#c28b4e'; rr(n.x - 11, n.y - 46, 22, 16, 3); ctx.fill();
-    ctx.font = `11px ${FONT}`; ctx.fillText(ICON[n.cat], n.x, n.y - 34);
-  }
-  if (n.tgt && n.t > 0) {
-    ctx.strokeStyle = '#9fe8c9'; ctx.lineWidth = 3; ctx.beginPath();
-    ctx.arc(n.x, n.y, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(n.t / (n.tgt.r ? 2 : 0.6), 0, 1)); ctx.stroke();
-  }
-}
-function drawPerson(x, y, o) {
-  const bob = Math.sin(o.walk || 0) * 2;
-  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(x, y + 12, 14, 6, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = o.shirt; ctx.beginPath(); ctx.ellipse(x, y + 2 + bob * 0.3, 13, 12, 0, 0, Math.PI * 2); ctx.fill();
-  if (o.apron) { ctx.fillStyle = '#2f9e72'; ctx.fillRect(x - 8, y - 2 + bob * 0.3, 16, 14); ctx.fillStyle = '#fff'; ctx.fillRect(x - 6, y + 1, 7, 4); }
-  if (o.hood) { ctx.fillStyle = '#1d2129'; ctx.beginPath(); ctx.arc(x, y - 13 + bob * 0.3, 12, 0, Math.PI * 2); ctx.fill(); }
-  ctx.fillStyle = o.skin; ctx.beginPath(); ctx.arc(x + (o.face || 0) * 1.5, y - 13 + bob * 0.3, 9, 0, Math.PI * 2); ctx.fill();
-  if (!o.hood) { ctx.fillStyle = o.hair; ctx.beginPath(); ctx.arc(x, y - 15 + bob * 0.3, 9, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
-  if (o.cap && !o.hood) {
-    ctx.fillStyle = '#22313f'; ctx.beginPath(); ctx.arc(x, y - 16 + bob * 0.3, 9.5, Math.PI, 0); ctx.fill();
-    ctx.fillRect(x + (o.face || 1) * 2 - 6, y - 17 + bob * 0.3, 12 + 4, 3);
-  }
-  else { ctx.fillStyle = '#111'; ctx.fillRect(x - 7 + (o.face || 0) * 1.5, y - 15 + bob * 0.3, 14, 4); }
-  ctx.fillStyle = '#222'; const ex = x + (o.face || 0) * 3;
-  if (!o.hood) { ctx.fillRect(ex - 4, y - 13 + bob * 0.3, 2, 3); ctx.fillRect(ex + 2, y - 13 + bob * 0.3, 2, 3); }
-}
-function drawBubble(x, y, txt, color = '#fff') {
-  ctx.font = `16px ${FONT}`; ctx.textAlign = 'center';
-  ctx.fillStyle = color; rr(x - 15, y - 18, 30, 24, 8); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(x - 4, y + 6); ctx.lineTo(x, y + 11); ctx.lineTo(x + 4, y + 6); ctx.fill();
-  ctx.fillStyle = txt === '!' || txt === '?' ? '#c62828' : '#222';
-  ctx.font = txt === '!' || txt === '?' ? `900 18px ${FONT}` : `16px ${FONT}`;
-  ctx.fillText(txt, x, y + 1);
-}
-function drawCustomer(c) {
-  if (c.drunk) {
-    const wob = Math.sin(performance.now() / 260 + c.walk) * 4;
-    drawPerson(c.x + wob, c.y, { shirt: c.shirt, skin: c.skin, hair: c.hair, walk: c.walk, face: c.face });
-    if (c.bubble) drawBubble(c.x + wob, c.y - 34, c.bubble, c.state === 'follow' ? '#e0c3ff' : '#fff');
-    return;
-  }
-  if (G.up.cctv && c.thief && c.cart.length) {
-    ctx.strokeStyle = '#ef4f4f'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.arc(c.x, c.y - 4, 24, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-  }
-  drawPerson(c.x, c.y, { shirt: c.shirt, skin: c.skin, hair: c.hair, walk: c.walk, face: c.face, cap: c.cap, hood: c.state === 'flee' });
-  if (c.cart.length) { ctx.fillStyle = '#e7d9b8'; ctx.fillRect(c.x + 8, c.y - 2, 10, 12); ctx.font = `10px ${FONT}`; ctx.fillText(c.cart.length, c.x + 13, c.y + 8); }
-  if (c.bubble) drawBubble(c.x, c.y - 34, c.bubble, c.bubble === '!' ? '#ffd166' : '#fff');
-  if (c.state === 'queue' || c.state === 'pick') {
-    const w = 30, pct = clamp(c.patience, 0, 100) / 100;
-    const by = c.bubble ? c.y - 58 : c.y - 30;
-    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(c.x - w / 2, by, w, 4);
-    ctx.fillStyle = pct < 0.3 ? '#ef4f4f' : pct < 0.6 ? '#f2b33d' : '#3cbf8a'; ctx.fillRect(c.x - w / 2, by, w * pct, 4);
-  }
-}
-function drawPlayer() {
-  const p = G.player;
-  drawPerson(p.x, p.y, { shirt: '#f5f5f0', skin: '#f0c49a', hair: '#2b1d14', walk: p.walk, face: p.face, apron: true });
-  if (G.carry && G.carry.kind === 'ship') {
-    const bx = p.x - 17, by = p.y - 56;
-    ctx.fillStyle = '#c28b4e'; rr(bx, by, 34, 26, 3); ctx.fill();
-    ctx.strokeStyle = '#8e5f2c'; ctx.lineWidth = 2; ctx.strokeRect(bx + 3, by + 3, 28, 20);
-    ctx.font = `13px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(ICON[G.carry.cat], p.x, by + 18);
-    ctx.fillStyle = '#2f9e72'; rr(bx + 4, by - 10, 26, 12, 3); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = `900 9px ${FONT}`; ctx.fillText('입고', p.x, by - 1);
-  } else if (G.carry) {
-    const bx = p.x - 13, by = p.y - 50;
-    ctx.fillStyle = '#c28b4e'; rr(bx, by, 26, 20, 3); ctx.fill();
-    ctx.font = `12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(ICON[G.carry.cat], p.x - 4, by + 15);
-    ctx.fillStyle = '#fff'; ctx.font = `900 10px ${FONT}`; ctx.fillText(G.carry.n, p.x + 8, by + 15);
-  }
-  const got = G.order ? G.order.items.filter(i => i.got).length : 0;
-  if (got) {
-    ctx.fillStyle = '#fff'; rr(p.x + 10, p.y - 6, 14, 16, 3); ctx.fill();
-    ctx.strokeStyle = '#2f9e72'; ctx.lineWidth = 1.5; ctx.strokeRect(p.x + 10, p.y - 6, 14, 16);
-    ctx.fillStyle = '#2f9e72'; ctx.font = `900 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(got, p.x + 17, p.y + 6);
-  }
-  const t = G.target;
-  if (t && (t.type === 'restock' || t.type === 'clean') && held.action) {
-    const pr = t.type === 'clean' ? t.pd.clean / 1.1 : G.holdT / 0.16;
-    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(p.x, p.y, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(pr, 0, 1)); ctx.stroke();
-  }
-}
+const LAMPS = [[150, 210], [560, 135], [560, 270], [560, 440], [760, 300], [180, 470]];
 function drawPuddle(pd) {
   ctx.fillStyle = 'rgba(94,170,230,.55)';
   ctx.beginPath();
   for (let a = 0; a <= Math.PI * 2 + 0.01; a += Math.PI / 8) {
     const r = pd.r * (1 - pd.clean / 1.1 * 0.6) * (0.85 + 0.15 * Math.sin(a * 3 + pd.seed));
-    const px = pd.x + Math.cos(a) * r, py = pd.y + Math.sin(a) * r * 0.6;
-    a === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    const px = pd.x + Math.cos(a) * r, pY = pd.y + Math.sin(a) * r * 0.7;
+    a === 0 ? ctx.moveTo(px, pY) : ctx.lineTo(px, pY);
   }
   ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.beginPath(); ctx.ellipse(pd.x - 5, pd.y - 3, 5, 2, -0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.ellipse(pd.x - 5, pd.y - 3, 6, 2.5, -0.4, 0, Math.PI * 2); ctx.fill();
+}
+function drawShipZone(s) {
+  ctx.fillStyle = s.late ? 'rgba(239,79,79,.2)' : 'rgba(255,194,61,.25)'; rr(552, 492, 166, 82, 8); ctx.fill();
+  ctx.strokeStyle = s.late ? '#ef4f4f' : '#e0a52a'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.stroke(); ctx.setLineDash([]);
+}
+
+// ---- back wall: storage shelving, clock, store sign, windows showing the time of day ----
+function skyCols() {
+  const h = G.time / 60;
+  const day = ['#7cc3ef', '#cdeafc'], dusk = ['#f08a4b', '#ffd29a'], night = ['#121836', '#2b3566'];
+  if (h < 16) return day;
+  if (h < 18.5) { const t = (h - 16) / 2.5; return [mix(day[0], dusk[0], t), mix(day[1], dusk[1], t)]; }
+  const t = clamp((h - 18.5) / 1.5, 0, 1); return [mix(dusk[0], night[0], t), mix(dusk[1], night[1], t)];
+}
+function drawBackWall() {
+  screenMode();
+  const b = py(20);
+  ctx.fillStyle = '#d5ddd8'; ctx.fillRect(0, 0, W, b);
+  ctx.fillStyle = '#b9c6c0'; ctx.fillRect(0, b - 10, W, 10);
+  // storage: dim wall with racks of boxes
+  ctx.fillStyle = '#8c7e69'; ctx.fillRect(0, 0, 370, b);
+  ctx.fillStyle = '#6d6252'; ctx.fillRect(30, 6, 310, 4); ctx.fillRect(30, 34, 310, 4);
+  for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 2 ? '#b98a52' : '#c79a62'; ctx.fillRect(36 + i * 34, 14 + (i % 3) * 2, 26, 20 - (i % 3) * 2); }
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.font = `700 11px ${FONT}`; ctx.textAlign = 'left'; ctx.fillText('창고 STAFF ONLY', 34, 56);
+  // clock
+  const cx = 404, cy = 36, m = G.time;
+  ellipse(cx, cy, 19, 19, '#2e3a42'); ellipse(cx, cy, 16, 16, '#fbfbf7');
+  ctx.strokeStyle = '#2e3a42'; ctx.lineCap = 'round';
+  const hand = (a, len, w) => { ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.sin(a) * len, cy - Math.cos(a) * len); ctx.stroke(); };
+  hand((m / 60 % 12) / 12 * Math.PI * 2, 8, 3); hand((m % 60) / 60 * Math.PI * 2, 12, 2);
+  ctx.lineCap = 'butt';
+  // store sign over the fridge, glowing after dark
+  const lit = lightLevel();
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,90,90,' + (0.2 + lit * 0.7) + ')'; ctx.shadowBlur = 6 + lit * 14;
+  ctx.fillStyle = '#e94545'; rr(470, 2, 260, 22, 6); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#ffd84d'; ctx.fillRect(476, 21, 248, 3);
+  ctx.fillStyle = '#fff'; ctx.font = `17px 'Black Han Sans', ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('점장 편의점 · 24', 600, 20);
+  // window on the right: sky, skyline, and stars at night
+  const [s0, s1] = skyCols(), wx = 772, wy = 6, ww = 160, wh = b - 18;
+  const g = ctx.createLinearGradient(0, wy, 0, wy + wh); g.addColorStop(0, s0); g.addColorStop(1, s1);
+  ctx.fillStyle = g; ctx.fillRect(wx, wy, ww, wh);
+  if (lit > 0.6) { ctx.fillStyle = `rgba(255,255,255,${lit - 0.4})`; for (let i = 0; i < 9; i++) ctx.fillRect(wx + (i * 37) % ww, wy + 4 + (i * 13) % 22, 1.5, 1.5); }
+  ctx.fillStyle = mix('#5d6f80', '#0d1226', lit);
+  [[0, 22, 26], [26, 14, 20], [46, 28, 34], [80, 18, 22], [102, 30, 28], [130, 20, 30]].forEach(([x, hh, w]) => ctx.fillRect(wx + x, wy + wh - hh, w, hh));
+  if (lit > 0.3) { ctx.fillStyle = `rgba(255,214,120,${lit})`; for (let i = 0; i < 14; i++) ctx.fillRect(wx + 4 + (i * 23) % 150, wy + wh - 6 - (i * 7) % 14, 3, 3); }
+  ctx.strokeStyle = '#7d8c94'; ctx.lineWidth = 4; ctx.strokeRect(wx, wy, ww, wh);
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + ww / 2, wy); ctx.lineTo(wx + ww / 2, wy + wh); ctx.stroke();
+  // poster
+  ctx.fillStyle = '#ffd84d'; rr(380, 58, 46, 14, 2); ctx.fill();
+  ctx.fillStyle = '#c0392b'; ctx.font = `900 9px ${FONT}`; ctx.fillText('1+1 행사', 403, 68);
+}
+
+// ---- standing things ----
+function shelfLabel(cat, x, y) {
+  const st = G.stock[cat], empty = st === 0, blink = empty && Math.floor(performance.now() / 300) % 2;
+  const label = empty ? `${NAME[cat]} 품절!` : `${NAME[cat]} ${st}/${MAXSTOCK}`;
+  ctx.font = `700 11px ${FONT}`; ctx.textAlign = 'center';
+  const tw = ctx.measureText(label).width + 14;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; rr(x - tw / 2 + 1, y - 9, tw, 17, 4); ctx.fill();
+  ctx.fillStyle = empty ? (blink ? '#ef4f4f' : '#b52f2f') : st <= 3 ? '#e8a33a' : '#ffd84d';
+  rr(x - tw / 2, y - 10, tw, 17, 4); ctx.fill();
+  ctx.fillStyle = empty ? '#fff' : '#2a1a00'; ctx.fillText(label, x, y + 3);
+}
+function slotsOnFace(g, cat, face, n, tiers, s) {
+  const per = Math.ceil(n / tiers);
+  for (let i = 0; i < n; i++) {
+    const tier = Math.floor(i / per), k = i % per, u = (k + 0.5) / per, v = tiers === 1 ? 0.12 : 0.1 + tier * 0.45;
+    const [x, y] = g[face](u, v);
+    if (i < G.stock[cat]) drawItem(cat, x, y, s);
+    else { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x - 3, y - 4, 6, 3); }
+  }
+}
+function drawGondola(cat) {
+  const s = SHELF[cat], g = GEO[cat] = prism(s, 46, '#f0f3f5', { front: '#d3dade', side: '#a9b4bb' });
+  // top: inset display tray with a centre divider
+  ctx.fillStyle = '#e1e6ea'; ctx.fillRect(g.x0 + g.L + 6, g.t0 + 5, g.w - 12, g.t1 - g.t0 - 10);
+  ctx.fillStyle = '#c9d1d6'; ctx.fillRect(g.x0 + g.L + 6, (g.t0 + g.t1) / 2 - 1, g.w - 12, 2);
+  // shelf boards
+  ctx.strokeStyle = '#9aa6ad'; ctx.lineWidth = 2;
+  for (const v of [0.1, 0.55]) { const [ax, ay] = g.front(0, v), [bx, by] = g.front(1, v); ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); }
+  slotsOnFace(g, cat, 'front', MAXSTOCK, 2, 0.95);
+  ctx.fillStyle = '#ef4f4f'; ctx.fillRect(g.x0, g.b1 - 3, g.w, 3);
+  shelfLabel(cat, g.x0 + g.L + g.w / 2, g.t0 - 4);
+}
+function drawFridgeBack() {
+  const cat = 'dosirak', s = SHELF[cat], g = GEO[cat] = prism(s, 52, '#4c5a63', { front: '#1f3340' });
+  // lit interior of the open case
+  const [ax, ay] = g.front(0, 1);
+  const lg = ctx.createLinearGradient(0, ay, 0, g.b1); lg.addColorStop(0, 'rgba(160,220,255,.55)'); lg.addColorStop(1, 'rgba(160,220,255,.1)');
+  ctx.fillStyle = lg; ctx.fillRect(ax + 4, ay + 12, g.w - 8, g.b1 - ay - 16);
+  ctx.strokeStyle = '#8fb4c6'; ctx.lineWidth = 2;
+  for (const v of [0.1, 0.5]) { const [x, y] = g.front(0, v); ctx.beginPath(); ctx.moveTo(x + 4, y); ctx.lineTo(x + g.w - 4, y); ctx.stroke(); }
+  slotsOnFace(g, cat, 'front', MAXSTOCK, 2, 1);
+  ctx.fillStyle = '#e0e7eb'; ctx.fillRect(g.x0, g.b1 - 4, g.w, 4);
+  shelfLabel(cat, g.x0 + g.w / 2, ay + 6);
+}
+function drawFridgeSide() {
+  const cat = 'drink', s = SHELF[cat], g = GEO[cat] = prism(s, 84, '#c6d2d9', { side: '#20323d', front: '#9fb0ba' });
+  // glass doors on the face toward the shop floor
+  const [ax, ay] = g.side(0, 0), [bx, by] = g.side(0, 1), [cx2, cy2] = g.side(1, 1), [dx, dy] = g.side(1, 0);
+  const lg = ctx.createLinearGradient(ax, 0, bx, 0); lg.addColorStop(0, 'rgba(170,225,255,.45)'); lg.addColorStop(1, 'rgba(170,225,255,.15)');
+  poly([[ax, ay], [bx, by], [cx2, cy2], [dx, dy]], lg);
+  ctx.strokeStyle = '#d7e2e8'; ctx.lineWidth = 1.5;
+  for (const u of [0, 0.25, 0.5, 0.75, 1]) { const [x1, y1] = g.side(u, 0.03), [x2, y2] = g.side(u, 0.97); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+  const per = Math.ceil(MAXSTOCK / 2);
+  for (let i = 0; i < MAXSTOCK; i++) {
+    const col = Math.floor(i / per), u = ((i % per) + 0.5) / per, [x, y] = g.side(u, 0.08 + col * 0.45);
+    if (i < G.stock[cat]) drawItem(cat, x + 4, y, 0.85); else { ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x + 1, y - 4, 6, 3); }
+  }
+  shelfLabel(cat, g.x0 - 22, g.t0 + 2);
+}
+function drawCrate(cat) {
+  const c = CRATE[cat], g = GEO['crate_' + cat] = prism(c, 26, '#d8a76a', { front: '#c08a4e', side: '#a3723c' });
+  ctx.fillStyle = '#ecd2a4'; ctx.fillRect(g.x0 + g.L + g.w / 2 - 4, g.t0, 8, g.t1 - g.t0);
+  const [x, y] = g.front(0.5, 0.15); drawItem(cat, x, y, 1.05);
+  ctx.fillStyle = '#3d2a14'; ctx.font = `700 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(NAME[cat], x, g.b1 + 11);
+  if (G.free[cat] > 0) {
+    const bx = g.x1 + g.L - 8, by = g.t0;
+    ctx.fillStyle = '#2f9e72'; rr(bx - 14, by - 8, 28, 15, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = `900 10px ${FONT}`; ctx.fillText(`+${G.free[cat]}`, bx, by + 3);
+  }
+}
+function drawCounter() {
+  const g = prism(COUNTER, 36, '#f4f5f1', { front: '#55656e', side: '#3f4c53' });
+  ctx.fillStyle = '#ffc23d'; ctx.fillRect(g.x0, g.b1 - 36, g.w, 4);
+  ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.font = `900 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('계산대 COUNTER', g.x0 + g.w / 2, g.b1 - 12);
+  // microwave on the counter top
+  const top = py(298) - 36, heat = G.mini && G.mini.phase === 'heat';
+  ctx.fillStyle = '#3a3f44'; rr(30, top - 24, 50, 26, 3); ctx.fill();
+  ctx.fillStyle = heat ? '#ffcf5a' : '#6b7c87'; ctx.fillRect(34, top - 20, 32, 18);
+  if (heat) { ctx.fillStyle = 'rgba(255,207,90,.35)'; ellipse(50, top - 10, 30, 16, 'rgba(255,207,90,.25)'); }
+  ctx.fillStyle = '#9fe8c9'; ctx.fillRect(70, top - 18, 6, 4);
+  // POS terminal
+  const pt = py(300) - 36, on = G.queue[0] && G.queue[0].atSlot;
+  ctx.fillStyle = '#2e3a42'; ctx.fillRect(158, pt - 8, 8, 10);
+  ctx.fillStyle = '#2e3a42'; rr(140, pt - 34, 44, 28, 3); ctx.fill();
+  ctx.fillStyle = on ? '#4fd1a5' : '#6f8b98'; ctx.fillRect(144, pt - 30, 36, 20);
+  if (on) { ctx.fillStyle = '#123'; ctx.font = `900 9px ${FONT}`; ctx.fillText('NEXT', 162, pt - 16); }
+  GEO.pos = { x: 136, y: pt - 38, w: 52, h: 42 };
+  ctx.fillStyle = '#ef4f4f'; rr(196, pt - 8, 16, 8, 2); ctx.fill();
+}
+function drawWall(r, z, col) { prism(r, z, col, { top: shade(col, 0.25) }); }
+function drawDoor() {
+  // automatic sliding doors open when anyone is near the entrance
+  const near = [G.player, ...G.customers, ...Object.values(G.helpers).filter(Boolean)].some(p => dist(p.x, p.y, 820, 580) < 80);
+  doorT = clamp(doorT + (near ? 0.12 : -0.06), 0, 1);
+  const off = doorT * 52;
+  for (const [x, d] of [[760, -1], [820, 1]]) {
+    const g = prism({ x: x + d * off, y: 584, w: 60, h: 6 }, 40, '#9fd3e6', { front: 'rgba(170,220,240,.35)', top: '#7d8c94', side: 'rgba(120,150,160,.5)' });
+    ctx.strokeStyle = '#7d8c94'; ctx.lineWidth = 2; ctx.strokeRect(g.x0, g.t1, g.w, g.z);
+  }
+}
+function drawShipBox(b) {
+  const g = prism({ x: b.x - 15, y: b.y - 8, w: 30, h: 18 }, 20, '#d8a76a', { front: '#c08a4e' });
+  const [x, y] = g.front(0.5, 0.12); drawItem(b.cat, x, y, 0.8);
+}
+function drawDrop(d) {
+  const x = d.x, y = feet(d.y - 6);
+  ellipse(x, y, 10, 4, 'rgba(0,0,0,.15)');
+  ctx.save(); ctx.translate(x, y); ctx.rotate(d.rot); drawItem(d.cat, 0, 4, 0.9); ctx.restore();
+}
+function drawPerson(x, y, o) {
+  // (x, y) = screen position of the feet
+  const t = o.walk || 0, sw = Math.sin(t) * 3, bob = Math.abs(Math.cos(t)) * 1.2, by = y - bob;
+  const l1 = Math.max(0, sw), l2 = Math.max(0, -sw);
+  ellipse(x, y, 13, 5, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = o.pants || '#34495e';
+  rr(x - 7, by - 13 - l1, 5.5, 12, 2); ctx.fill(); rr(x + 1.5, by - 13 - l2, 5.5, 12, 2); ctx.fill();
+  ctx.fillStyle = '#222'; ctx.fillRect(x - 7.5, by - 3 - l1, 6.5, 3); ctx.fillRect(x + 1, by - 3 - l2, 6.5, 3);
+  ctx.fillStyle = shade(o.shirt, -0.12);
+  rr(x - 14.5, by - 30 + l2 * 0.6, 5, 14, 2.5); ctx.fill(); rr(x + 9.5, by - 30 + l1 * 0.6, 5, 14, 2.5); ctx.fill();
+  ellipse(x - 12, by - 15 + l2 * 0.6, 2.6, 2.6, o.skin); ellipse(x + 12, by - 15 + l1 * 0.6, 2.6, 2.6, o.skin);
+  ctx.fillStyle = o.shirt; rr(x - 11, by - 33, 22, 22, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,.14)'; rr(x + 4, by - 31, 6, 19, 3); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.2)'; rr(x - 9, by - 31, 5, 10, 3); ctx.fill();
+  if (o.apron) { ctx.fillStyle = '#2f9e72'; rr(x - 8, by - 27, 16, 16, 3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 5, by - 23, 6, 3); }
+  const f = o.face || 0, hx = x + f * 1.5, hy = by - 42;
+  if (o.hood) ellipse(x, hy - 1, 12, 12, '#1d2129');
+  ellipse(hx, hy, 9.5, 9.5, o.skin);
+  if (!o.hood) {
+    ctx.fillStyle = o.hair; ctx.beginPath(); ctx.arc(x, hy - 2, 10, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
+    ctx.fillStyle = '#222'; const ex = hx + f * 2.5;
+    ctx.fillRect(ex - 4, hy, 2, 3); ctx.fillRect(ex + 2, hy, 2, 3);
+    if (o.blush) { ellipse(ex - 5, hy + 4.5, 2.5, 1.6, 'rgba(230,60,60,.6)'); ellipse(ex + 5, hy + 4.5, 2.5, 1.6, 'rgba(230,60,60,.6)'); }
+  }
+  if (o.cap && !o.hood) {
+    ctx.fillStyle = '#22313f'; ctx.beginPath(); ctx.arc(x, hy - 3, 10.5, Math.PI, 0); ctx.fill();
+    ctx.fillRect(x + (f || 1) * 3 - 7, hy - 4, 16, 3);
+  }
+}
+function drawRider(o) {
+  const r = o.rider, y = feet(r.y);
+  ellipse(r.x - 14, y + 2, 30, 7, 'rgba(0,0,0,.2)');
+  ctx.fillStyle = '#111'; ellipse(r.x - 36, y - 4, 6, 6, '#111'); ellipse(r.x + 8, y - 4, 6, 6, '#111');
+  ctx.fillStyle = '#2b2d42'; rr(r.x - 40, y - 18, 52, 12, 6); ctx.fill();
+  ctx.fillStyle = '#ef4f4f'; rr(r.x - 44, y - 40, 22, 20, 3); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = `900 8px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('배달', r.x - 33, y - 27);
+  drawPerson(r.x, y - 4, { shirt: '#2a9df4', skin: '#e0ac7e', hair: '#111', pants: '#2d3436', walk: 0, face: -1 });
+  ctx.fillStyle = '#e63946'; ctx.beginPath(); ctx.arc(r.x - 1.5, y - 50, 11, Math.PI, 0); ctx.fill();
+}
+function drawHelper(n) {
+  const y = feet(n.y);
+  drawPerson(n.x, y, { shirt: n.shirt, skin: '#f0c49a', hair: '#3a2a20', walk: n.walk, face: n.face, apron: true });
+  ctx.fillStyle = '#1b2a33'; ctx.font = `700 9px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(`${n.label} 알바`, n.x, y + 13);
+  if (n.job === 'go' || n.job === 'fill') { ctx.fillStyle = '#c28b4e'; rr(n.x - 12, y - 74, 24, 18, 3); ctx.fill(); drawItem(n.cat, n.x, y - 58, 0.7); }
+  if (n.tgt && n.t > 0) ringAt(n.x, y, clamp(n.t / (n.tgt.r ? 2 : 0.6), 0, 1), '#9fe8c9');
+}
+function ringAt(x, y, pct, col) {
+  ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath();
+  ctx.ellipse(x, y, 22, 9, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct); ctx.stroke();
+}
+function drawBubble(x, y, txt, color = '#fff') {
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; rr(x - 14, y - 16, 30, 24, 8); ctx.fill();
+  ctx.fillStyle = color; rr(x - 15, y - 18, 30, 24, 8); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x - 4, y + 6); ctx.lineTo(x, y + 11); ctx.lineTo(x + 4, y + 6); ctx.fill();
+  ctx.textAlign = 'center';
+  if (CAT_OF[txt]) { drawItem(CAT_OF[txt], x, y + 3, 0.9); return; }
+  ctx.fillStyle = txt === '!' || txt === '?' ? '#c62828' : '#222';
+  ctx.font = txt === '!' || txt === '?' ? `900 18px ${FONT}` : `16px ${FONT}`;
+  ctx.fillText(txt, x, y + 1);
+}
+function drawCustomer(c) {
+  const y = feet(c.y);
+  if (c.drunk) {
+    const wob = Math.sin(performance.now() / 260 + c.walk) * 4;
+    drawPerson(c.x + wob, y, { shirt: c.shirt, skin: c.skin, hair: c.hair, walk: c.walk, face: c.face, blush: true });
+    return;
+  }
+  if (G.up.cctv && c.thief && c.cart.length) {
+    ctx.strokeStyle = '#ef4f4f'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.ellipse(c.x, y, 24, 10, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  }
+  drawPerson(c.x, y, { shirt: c.shirt, pants: c.pants, skin: c.skin, hair: c.hair, walk: c.walk, face: c.face, cap: c.cap, hood: c.state === 'flee' });
+  if (c.cart.length) {
+    // shopping basket in hand
+    const bx = c.x + 14, by = y - 14;
+    ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(bx, by - 6, 5, Math.PI, 0); ctx.stroke();
+    ctx.fillStyle = '#e74c3c'; rr(bx - 7, by - 6, 14, 10, 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = `900 9px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(c.cart.length, bx, by + 2);
+  }
+}
+function drawCustomerUI(c) {
+  const y = feet(c.y), wob = c.drunk ? Math.sin(performance.now() / 260 + c.walk) * 4 : 0;
+  if (c.bubble) drawBubble(c.x + wob, y - 68, c.bubble, c.drunk && c.state === 'follow' ? '#e0c3ff' : c.bubble === '!' ? '#ffd166' : '#fff');
+  if (c.state === 'queue' || c.state === 'pick') {
+    const w = 30, pct = clamp(c.patience, 0, 100) / 100, by = c.bubble ? y - 94 : y - 62;
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(c.x - w / 2, by, w, 4);
+    ctx.fillStyle = pct < 0.3 ? '#ef4f4f' : pct < 0.6 ? '#f2b33d' : '#3cbf8a'; ctx.fillRect(c.x - w / 2, by, w * pct, 4);
+  }
+}
+function drawPlayer() {
+  const p = G.player, y = feet(p.y);
+  drawPerson(p.x, y, { shirt: '#f5f5f0', skin: '#f0c49a', hair: '#2b1d14', pants: '#2d3436', walk: p.walk, face: p.face, apron: true });
+  // "점장" name tag so the player is easy to find in a crowd
+  ctx.fillStyle = '#ffc23d'; rr(p.x - 13, y + 4, 26, 12, 6); ctx.fill();
+  ctx.fillStyle = '#2a1a00'; ctx.font = `900 9px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('점장', p.x, y + 13);
+  if (G.carry && G.carry.kind === 'ship') {
+    const g = prism({ x: p.x - 16, y: (y - 58 - TOP) / SY, w: 32, h: 16 }, 22, '#d8a76a', { front: '#c08a4e' });
+    const [ix, iy] = g.front(0.5, 0.15); drawItem(G.carry.cat, ix, iy, 0.8);
+    ctx.fillStyle = '#2f9e72'; rr(p.x - 13, g.t0 - 13, 26, 12, 3); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = `900 9px ${FONT}`; ctx.fillText('입고', p.x, g.t0 - 4);
+  } else if (G.carry) {
+    const g = prism({ x: p.x - 14, y: (y - 56 - TOP) / SY, w: 28, h: 14 }, 18, '#d8a76a', { front: '#c08a4e' });
+    const [ix, iy] = g.front(0.35, 0.15); drawItem(G.carry.cat, ix, iy, 0.75);
+    ctx.fillStyle = '#fff'; ctx.font = `900 10px ${FONT}`; ctx.fillText(G.carry.n, p.x + 8, iy - 3);
+  }
+  const got = G.order ? G.order.items.filter(i => i.got).length : 0;
+  if (got) {
+    ctx.fillStyle = '#fff'; rr(p.x + 12, y - 26, 14, 16, 3); ctx.fill();
+    ctx.strokeStyle = '#2f9e72'; ctx.lineWidth = 1.5; ctx.strokeRect(p.x + 12, y - 26, 14, 16);
+    ctx.fillStyle = '#2f9e72'; ctx.font = `900 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(got, p.x + 19, y - 14);
+  }
+  const t = G.target;
+  if (t && (t.type === 'restock' || t.type === 'clean') && held.action) ringAt(p.x, y, clamp(t.type === 'clean' ? t.pd.clean / 1.1 : G.holdT / 0.16, 0, 1), '#ffd166');
+}
+function drawTarget(t) {
+  ctx.strokeStyle = '#ffd166'; ctx.setLineDash([6, 4]);
+  const geo = t.type === 'crate' ? GEO['crate_' + t.cat] : (t.type === 'restock' || t.type === 'orderpick') ? GEO[t.cat] : null;
+  if (geo) { ctx.lineWidth = 3; poly(geo.hull); ctx.stroke(); }
+  if (t.type === 'pos') { const r = GEO.pos; ctx.lineWidth = 3; ctx.strokeRect(r.x, r.y, r.w, r.h); }
+  const pt = t.type === 'shipbox' ? t.b : t.type === 'drop' ? t.d : t.type === 'escort' ? t.c : t.type === 'deliver' ? G.order.rider : null;
+  if (pt) { ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(pt.x, feet(pt.y), 24, 10, 0, 0, Math.PI * 2); ctx.stroke(); }
+  if (t.type === 'clean') { ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(t.pd.x, py(t.pd.y), t.pd.r + 6, (t.pd.r * 0.7 + 6) * SY, 0, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.setLineDash([]);
+}
+function drawShipTimer(s) {
+  const pct = clamp(s.t / s.T, 0, 1), y = py(494);
+  ctx.fillStyle = 'rgba(0,0,0,.3)'; rr(556, y - 4, 158, 6, 3); ctx.fill();
+  ctx.fillStyle = s.late ? '#ef4f4f' : pct < 0.3 ? '#f2b33d' : '#3cbf8a'; rr(556, y - 4, 158 * (s.late ? 1 : pct), 6, 3); ctx.fill();
+}
+function drawLighting() {
+  const lit = lightLevel();
+  if (lit > 0) {
+    ctx.fillStyle = `rgba(16,22,58,${lit * 0.4})`; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    for (const [x, y] of LAMPS) {
+      const sy = py(y), g = ctx.createRadialGradient(x, sy, 10, x, sy, 150);
+      g.addColorStop(0, `rgba(255,214,150,${lit * 0.16})`); g.addColorStop(1, 'rgba(255,214,150,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - 150, sy - 150, 300, 300);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  const v = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.45, W / 2, H * 0.55, H * 1.05);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.32)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
 }
 function draw() {
+  const k = G.shake * 9; shX = (Math.random() - 0.5) * k; shY = (Math.random() - 0.5) * k;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = '#1b2a33'; ctx.fillRect(0, 0, W, H);
   drawFloor();
-  CATS.forEach(drawCrate);
-  CATS.forEach(drawShelf);
-  drawCounter();
-  G.puddles.forEach(drawPuddle);
-  G.drops.forEach(drawDrop);
-  if (G.ship) drawShipment(G.ship);
-  // highlight target
-  const t = G.target;
-  if (t && t.type !== 'none') {
-    let r = t.type === 'pos' ? { x: 135, y: 280, w: 54, h: 34 } : t.type === 'crate' ? CRATE[t.cat] : (t.type === 'restock' || t.type === 'orderpick') ? SHELF[t.cat] : null;
-    const pt = t.type === 'shipbox' ? t.b : t.type === 'drop' ? t.d : t.type === 'escort' ? t.c : t.type === 'deliver' ? G.order.rider : null;
-    if (pt) { ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(pt.x, pt.y, 22, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
-    if (t.type === 'clean') { ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.ellipse(t.pd.x, t.pd.y, t.pd.r + 6, t.pd.r * 0.6 + 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
-    if (r) { ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.strokeRect(r.x - 4, r.y - 4, r.w + 8, r.h + 8); ctx.setLineDash([]); }
-  }
-  const ents = [...G.customers.map(c => ({ y: c.y, f: () => drawCustomer(c) })), { y: G.player.y, f: drawPlayer }];
-  if (G.order) ents.push({ y: G.order.rider.y, f: () => drawRider(G.order) });
-  for (const n of Object.values(G.helpers)) if (n) ents.push({ y: n.y, f: () => drawHelper(n) });
+  drawBackWall();
+  // everything standing, painted back to front by where it touches the floor
+  const ents = [
+    { y: 65, f: drawFridgeBack },
+    { y: 135, f: () => drawWall({ x: 20, y: 125, w: 280, h: 10 }, 20, '#5d6c75') },
+    { y: 135, f: () => drawWall({ x: 360, y: 20, w: 10, h: 115 }, 20, '#5d6c75') },
+    { y: 330, f: drawCounter },
+    { y: 420, f: drawFridgeSide },
+    { y: 600, f: () => drawWall({ x: 0, y: 20, w: 20, h: 580 }, 80, '#4a5a63') },
+    { y: 600, f: () => drawWall({ x: 940, y: 20, w: 20, h: 580 }, 80, '#4a5a63') },
+    { y: 600, f: () => drawWall({ x: 0, y: 586, w: 760, h: 14 }, 14, '#4a5a63') },
+    { y: 600, f: () => drawWall({ x: 880, y: 586, w: 80, h: 14 }, 14, '#4a5a63') },
+    { y: 599, f: drawDoor },
+    ...CATS.map(c => ({ y: CRATE[c].y + CRATE[c].h, f: () => drawCrate(c) })),
+    { y: SHELF.ramen.y + SHELF.ramen.h, f: () => drawGondola('ramen') },
+    { y: SHELF.snack.y + SHELF.snack.h, f: () => drawGondola('snack') },
+    ...G.drops.map(d => ({ y: d.y, f: () => drawDrop(d) })),
+    ...(G.ship ? G.ship.boxes.map(b => ({ y: b.y + 10, f: () => drawShipBox(b) })) : []),
+    ...G.customers.map(c => ({ y: c.y + 10, f: () => drawCustomer(c) })),
+    { y: G.player.y + 10, f: drawPlayer },
+  ];
+  if (G.staff.cashier) ents.push({ y: 268, f: () => drawCashierClerk() });
+  if (G.order) ents.push({ y: G.order.rider.y + 10, f: () => drawRider(G.order) });
+  for (const n of Object.values(G.helpers)) if (n) ents.push({ y: n.y + 10, f: () => drawHelper(n) });
+  screenMode();
   ents.sort((a, b) => a.y - b.y).forEach(e => e.f());
-  // floats
+  // effects and labels stay on top
+  G.fx.forEach(f => { ctx.globalAlpha = clamp((f.life - f.t) * 3, 0, 1); ellipse(f.x, py(f.y) - f.z, 3, 3, f.col); });
+  ctx.globalAlpha = 1;
+  if (G.ship) drawShipTimer(G.ship);
+  if (G.target && G.target.type !== 'none') drawTarget(G.target);
+  G.customers.forEach(drawCustomerUI);
+  drawLighting();
   ctx.textAlign = 'center';
   G.floats.forEach(f => {
     ctx.globalAlpha = clamp(1.6 - f.t, 0, 1);
     ctx.font = `900 14px ${FONT}`; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.6)';
-    const y = f.y - f.t * 30;
+    const y = py(f.y) - 22 - f.t * 30;
     ctx.strokeText(f.txt, f.x, y); ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x, y);
   });
   ctx.globalAlpha = 1;
-  // evening tint
-  const h = G.time / 60;
-  if (h > 18) { ctx.fillStyle = `rgba(20,30,70,${clamp((h - 18) / 4, 0, 1) * 0.18})`; ctx.fillRect(0, 0, W, H); }
+}
+function drawCashierClerk() {
+  const y = feet(258);
+  drawPerson(222, y, { shirt: '#f5f5f0', skin: '#e0ac7e', hair: '#5a3a22', pants: '#2d3436', walk: 0, face: -1, apron: true });
+  ctx.fillStyle = '#1b2a33'; ctx.font = `700 9px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('계산 알바', 222, y - 56);
+  if (G.clerkT > 0) {
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3; ctx.beginPath();
+    ctx.arc(222, y - 66, 7, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (G.clerkT / 4)); ctx.stroke();
+  }
 }
 
 // ---------- HUD ----------
@@ -1326,7 +1598,7 @@ function showTitle() {
   mode = 'title';
   screenEl.hidden = false;
   screenEl.innerHTML = `<div class="card">
-    <span class="tag">PROTOTYPE v0.5</span>
+    <span class="tag">PROTOTYPE v0.6</span>
     <h1>나는 편의점 점장이다</h1>
     <p>오늘부터 당신이 이 가게의 점장. 박스를 나르고, 바코드를 찍고, 도시락을 데우고,<br>쏟아진 음료를 닦고, 도둑을 잡으세요. 08:00부터 22:00까지, 약 3분 30초의 하루.</p>
     <div class="shop" id="setup"></div>
