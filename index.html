@@ -14,7 +14,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700;900&display=swap">
 <style>
-/* layout: one column — HUD strip, game stage (canvas + overlays), hint line, touch pad, controls */
+/* layout: the game fills the window; HUD, hint, panels and the touch pad float over it */
 :root{
   --night:#122029; --panel:#1a2e3a; --line:#2d4858; --ink:#eef4f1; --muted:#93abb6;
   --sign:#ffc23d; --tag:#ef4f4f; --mint:#4fd1a5;
@@ -23,25 +23,31 @@
   color-scheme:dark;
 }
 [hidden]{display:none!important}
-html,body{background:var(--night);color:var(--ink)}
-body{font-family:var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}
-.app{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
-.hud{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-variant-numeric:tabular-nums}
-.hud .brand{font-family:var(--display);font-size:18px;color:var(--sign);letter-spacing:.02em;margin-right:auto}
+html,body{background:var(--stagebg,var(--night));color:var(--ink);margin:0;height:100%;overflow:hidden}
+body{font-family:var(--body)}
+.app{position:fixed;inset:0}
+.hud{position:absolute;z-index:5;top:max(8px,env(safe-area-inset-top,0px));left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;font-variant-numeric:tabular-nums}
+.hud>*{pointer-events:auto}
+.hud .hbtns{flex:none}
+.hud button{white-space:nowrap}
+.hstats{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;background:rgba(14,18,26,.78);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:6px 14px}
+.hud .brand{font-family:var(--display);font-size:16px;color:var(--sign);letter-spacing:.02em}
 .hud .stat{display:flex;flex-direction:column;line-height:1.15}
 .hud .stat small{font-size:10px;color:var(--muted);letter-spacing:.08em}
 .hud .stat b{font-size:15px}
 .stars{color:var(--sign)}
 .stam{width:70px;height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:4px}
 .stam i{display:block;height:100%;background:var(--mint)}
-.hud button{background:none;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;cursor:pointer}
+.hud button{background:rgba(14,18,26,.78);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.14);color:var(--ink);border-radius:10px;padding:7px 10px;font:inherit;font-size:12px;cursor:pointer}
 .hud button:focus-visible,.screen button:focus-visible,.mini button:focus-visible{outline:2px solid var(--sign);outline-offset:2px}
-.stage{position:relative;border:2px solid var(--line);border-radius:10px;overflow:hidden;background:#000}
-canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;touch-action:none}
-.hint{min-height:24px;font-size:14px;color:var(--muted);text-align:center}
+.stage{position:absolute;inset:0;overflow:hidden;background:var(--stagebg,#000)}
+canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(100vw,calc(100dvh * 1.6));height:auto;aspect-ratio:16/10;touch-action:none}
+.hint{position:absolute;z-index:4;left:50%;bottom:max(10px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);font-size:14px;color:#eef4f1;text-align:center;background:rgba(14,18,26,.78);border-radius:999px;padding:6px 16px;pointer-events:none}
+.hint:empty{display:none}
 .hint b{color:var(--sign)}
-.screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,20,27,.9);padding:16px;overflow:auto}
-.card{max-width:520px;width:100%;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+.screen{position:absolute;inset:0;z-index:30;display:flex;align-items:flex-start;justify-content:center;background:rgba(10,20,27,.35);padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));overflow:auto}
+.card{margin:auto}
+.card{max-width:540px;width:100%;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;background:rgba(14,18,26,.9);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
 .card h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,6vw,52px);margin:0;color:var(--sign);text-wrap:balance;text-shadow:0 3px 0 #9a5d00}
 .card h2{font-family:var(--display);font-weight:400;font-size:clamp(22px,4vw,32px);margin:0;color:var(--sign)}
 .card p{margin:0;color:var(--muted);font-size:14px;line-height:1.6}
@@ -61,7 +67,7 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;touch-action:none
 .up button:disabled{background:var(--line);color:var(--muted);cursor:default}
 .up.owned button:disabled{background:none;border:1px solid var(--mint);color:var(--mint)}
 .up button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.mini{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:min(560px,94%);max-height:calc(100% - 16px);overflow:auto;background:var(--panel);border:2px solid var(--sign);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.mini{position:absolute;z-index:20;top:calc(max(8px,env(safe-area-inset-top,0px)) + 56px);left:50%;transform:translateX(-50%);width:min(560px,94%);max-height:calc(100% - 16px);overflow:auto;background:var(--panel);border:2px solid var(--sign);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .mini.shake{animation:shake .25s}
 @keyframes shake{25%{transform:translateX(calc(-50% - 6px))}75%{transform:translateX(calc(-50% + 6px))}}
 .mhead{display:flex;align-items:center;gap:10px;font-size:13px}
@@ -92,22 +98,22 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;touch-action:none
 .mfoot b{color:var(--ink);font-size:16px}
 .alarm{background:var(--tag);color:#fff;font-weight:700;font-size:13px;text-align:center;border-radius:6px;padding:5px;animation:blink .5s infinite alternate}
 @keyframes blink{to{opacity:.55}}
-.banner{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:2;background:var(--sign);color:#2a1a00;font-weight:900;font-size:14px;padding:8px 16px;border-radius:999px;box-shadow:0 4px 0 #9a5d00;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
-.order{position:absolute;left:8px;bottom:8px;background:var(--panel);border:2px solid var(--mint);border-radius:8px;padding:8px 10px;font-size:12px;min-width:150px;display:flex;flex-direction:column;gap:3px;font-variant-numeric:tabular-nums;pointer-events:none}
+.banner{position:absolute;left:50%;top:calc(max(8px,env(safe-area-inset-top,0px)) + 56px);transform:translateX(-50%);z-index:2;background:var(--sign);color:#2a1a00;font-weight:900;font-size:14px;padding:8px 16px;border-radius:999px;box-shadow:0 4px 0 #9a5d00;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.order{position:absolute;z-index:3;left:max(12px,env(safe-area-inset-left,0px));top:calc(max(8px,env(safe-area-inset-top,0px)) + 64px);background:var(--panel);border:2px solid var(--mint);border-radius:8px;padding:8px 10px;font-size:12px;min-width:150px;display:flex;flex-direction:column;gap:3px;font-variant-numeric:tabular-nums;pointer-events:none}
 .order b{color:var(--mint);font-size:13px}
 .order .got{color:var(--muted);text-decoration:line-through}
 .order .go{color:var(--sign);font-weight:700}
 .order .tbar{height:5px;background:var(--line);border-radius:3px;overflow:hidden}
 .order .tbar i{display:block;height:100%;background:var(--mint)}
-.pad{display:none;justify-content:space-between;align-items:center;gap:16px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-@media (pointer:coarse){.pad{display:flex}}
-.stick{position:relative;width:150px;height:150px;flex:none;border-radius:50%;background:var(--panel);border:2px solid var(--line);touch-action:none}
+.pad{display:none;position:absolute;inset:0;z-index:6;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+@media (pointer:coarse){.pad{display:block}}
+.stick{position:absolute;left:max(20px,env(safe-area-inset-left,0px));bottom:max(20px,env(safe-area-inset-bottom,0px));width:140px;height:140px;border-radius:50%;background:rgba(14,18,26,.35);border:2px solid rgba(255,255,255,.28);touch-action:none;pointer-events:auto}
 .stick .ar{position:absolute;color:var(--muted);font-size:14px;pointer-events:none}
 .stick .u{top:8px;left:50%;transform:translateX(-50%)}.stick .d{bottom:8px;left:50%;transform:translateX(-50%)}
 .stick .l{left:10px;top:50%;transform:translateY(-50%)}.stick .r{right:10px;top:50%;transform:translateY(-50%)}
-.knob{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;background:var(--line);border:2px solid var(--muted);pointer-events:none}
-.pad button{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:10px;font-size:20px;font-weight:700;touch-action:none}
-.pad button:active,.pad button.on{background:var(--line)}
+.knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.6);pointer-events:none}
+.pad button{background:rgba(14,18,26,.45);border:2px solid rgba(255,255,255,.3);color:#fff;font-size:20px;font-weight:700;touch-action:none}
+.pad button:active,.pad button.on{background:rgba(255,255,255,.3)}
 button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 /* a game, not a document: no text selection or long-press copy menu */
 .app{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -127,35 +133,30 @@ canvas{-webkit-touch-callout:none}
 .mcancel{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
 /* phones: overlays use the whole screen, checkout panel floats at the top */
 @media (pointer:coarse),(max-width:700px){
-  .screen{position:fixed;z-index:30;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-  .mini{position:fixed;z-index:20;top:calc(env(safe-area-inset-top,0px) + 6px);max-height:62dvh;padding:10px 12px;gap:8px}
+  .mini{max-height:62dvh;padding:10px 12px;gap:8px}
   .item{flex-basis:80px;padding:6px}
   .item .ic{font-size:20px}
   .item .key{font-size:20px}
-  .hud{gap:4px 12px;padding:6px 10px}
-  .hud .brand{font-size:15px}
-  .hud .stat b{font-size:13px}
-}
-@media (pointer:coarse) and (orientation:portrait){.app .help{display:none}}
-/* phone held sideways: stick | game | buttons */
-@media (pointer:coarse) and (orientation:landscape){
-  body{padding-block:4px}
-  .app{max-width:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"hud hud hud" "stick stage btns" "hint hint hint";gap:4px 12px;align-items:center}
-  .hud{grid-area:hud}
+  .hstats{gap:2px 12px;padding:5px 10px}
   .hud .brand{display:none}
-  .stage{grid-area:stage;justify-self:center;width:min(100%,calc((100dvh - 96px) * 1.6))}
-  .hint{grid-area:hint;min-height:0;font-size:12px}
-  .pad{display:contents}
-  .stick{grid-area:stick;width:130px;height:130px}
-  .mini{width:min(560px,calc(100vw - 340px));max-height:calc(100dvh - 12px)}
-  .app .abtns{grid-area:btns;flex-direction:column;align-items:center}
-  .app .abtns button{width:64px;height:64px;font-size:13px}
-  .app .abtns [data-k=action]{width:80px;height:80px}
-  .app .help{display:none}
+  .hud .stat b{font-size:13px}
+  .hint{font-size:12px}
 }
-.abtns{display:flex;gap:10px;align-items:flex-end}
-.abtns button{width:76px;height:76px;border-radius:50%;font-size:15px}
-.abtns [data-k=action]{background:var(--sign);color:#2a1a00;border:0;width:88px;height:88px}
+@media (pointer:coarse) and (orientation:landscape){
+  .hint{max-width:calc(100vw - 380px)}
+  .mini{width:min(560px,calc(100vw - 340px));max-height:calc(100dvh - 70px)}
+}
+@media (pointer:coarse) and (orientation:portrait){
+  .hint{bottom:auto;top:calc(50% - 31.25vw - 42px)}
+  .order{top:calc(50% + 31.25vw + 8px)}
+}
+.abtns{position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:max(20px,env(safe-area-inset-bottom,0px));display:flex;gap:12px;align-items:flex-end;pointer-events:auto}
+.abtns button{width:70px;height:70px;border-radius:50%;font-size:14px}
+.abtns [data-k=action]{background:rgba(255,194,61,.92);color:#2a1a00;border-color:rgba(255,255,255,.55);width:92px;height:92px;font-size:16px}
+.howto{width:100%;text-align:left}
+.howto summary{cursor:pointer;color:var(--sign);font-weight:700;font-size:14px;text-align:center;list-style:none}
+.howto summary::-webkit-details-marker{display:none}
+.howto .help{margin-top:8px}
 .help{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:13px;color:var(--muted)}
 .help div{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;line-height:1.6}
 .help b{color:var(--ink)}
@@ -166,12 +167,14 @@ kbd{font-family:inherit;font-size:11px;background:var(--night);border:1px solid 
 <body>
 <div class="app">
   <header class="hud">
+    <div class="hstats">
     <div class="brand">편의점 점장 <span id="hDay" style="font-family:var(--body);font-size:12px;color:var(--muted)">1일차</span></div>
     <div class="stat"><small>시각</small><b id="hClock">08:00</b></div>
     <div class="stat"><small>매출</small><b id="hRev">0원</b></div>
     <div class="stat"><small>순이익</small><b id="hNet">0원</b></div>
     <div class="stat"><small>평점</small><b><span class="stars" id="hStars">★★★☆☆</span> <span id="hRate">3.0</span></b></div>
     <div class="stat"><small>체력</small><div class="stam"><i id="hStam" style="width:100%"></i></div></div>
+    </div>
     <div class="hbtns"><button id="fsBtn" type="button" hidden>전체화면</button><button id="pauseBtn" type="button">일시정지</button><button id="muteBtn" type="button">소리 켜짐</button></div>
   </header>
 
@@ -194,7 +197,7 @@ kbd{font-family:inherit;font-size:11px;background:var(--night);border:1px solid 
     </div>
   </div>
 
-  <section class="help">
+  <template id="helpTpl">
     <div><b>이동</b> <kbd>WASD</kbd> / <kbd>방향키</kbd><br><b>달리기</b> <kbd>Shift</kbd> (체력 소모)<br><b>행동</b> <kbd>E</kbd> / <kbd>Space</kbd> · 꾹 누르면 진열·걸레질</div>
     <div><b>창고</b>에서 박스를 꺼내 같은 종류 <b>선반</b>에 진열하세요. 품절이면 손님이 화를 냅니다.</div>
     <div><b>계산대</b>에서 방향키로 바코드 스캔, 전자레인지 타이밍, 거스름돈 계산. <kbd>Q</kbd>로 계산을 멈추고 도둑을 쫓을 수 있어요.</div>
@@ -202,7 +205,7 @@ kbd{font-family:inherit;font-size:11px;background:var(--night);border:1px solid 
     <div><b>난이도와 알바</b> · 시작 화면과 마감 정산 화면에서 난이도(쉬움·보통·어려움)를 고르고, 계산·진열·매장 알바를 고용할 수 있어요. 일당은 그날 순이익에서 빠져요.</div>
     <div><b>점포 투자</b> · 마감 정산 화면에서 번 돈으로 운동화, 대용량 박스, 선반 확장, 고속 스캐너, CCTV를 살 수 있어요.</div>
     <div><b>돌발 이벤트</b> · 🚚 <b>물류 입고</b>: 입구 박스를 창고의 같은 칸에 넣으면 무료 박스로 적립. 🛵 <b>배달 주문</b>: 선반을 돌며 담아 라이더에게. 🍺 <b>취객</b>: E로 달래서 입구까지 데리고 나가세요.</div>
-  </section>
+  </template>
 </div>
 
 <script>
@@ -1074,16 +1077,62 @@ function update(dt) {
 // coordinates; py() maps a floor y to the screen.
 const FONT = "'Noto Sans KR','Malgun Gothic',sans-serif";
 const DISPLAY = "'Black Han Sans','Noto Sans KR',sans-serif";
-const TOP = 110, SY = 0.8, INK = '#2e2a33';
+const TOP = 110, SY = 0.8;
+// art directions; the player picks one on the start screen (saved per device)
+const THEMES = {
+  cartoon: { name: '카툰', desc: '아기자기한 기본', ink: '#2e2a33', inkW: 1, bg: '#3b3640', shadow: 'rgba(40,30,20,.16)',
+    floor: 'tile', floorA: '#f5ecda', floorB: '#ede2cb', seam: 'rgba(0,0,0,0)', storage: '#cfc5b3', plinth: '#d9cfbd', rug: '#d9e8df', rugLine: '#bcd3c6', spot: 'rgba(47,158,114,.18)', mat: '#4d5f68',
+    wall: '#cfeadf', wallLow: '#b8d9cc', lowH: 14, stripe1: '#2f9e72', stripe2: '#f2a33a', storeWall: '#d6c7ae', storeLow: '#c2b298', rack: '#8a7a64', box1: '#d8a76a', box2: '#c99558',
+    sign: '#2f9e72', signText: '#fff', signName: '점장 편의점', tag: '#f2a33a', tagText: '24H', frame: '#fffdf6', clock: '#fffdf6', poster: '#ffd84d', posterText: '#e04848',
+    part: '#4f7f80', shelfTop: '#f4f4f1', shelfFront: '#e6e8e3', board: '#c4c9c3', chiller: '#eef3f3', chillerFront: '#dfe7e8', chillerIn: ['#9fdcf2', '#3f7f98'],
+    cooler: '#e9eef0', coolerTop: '#c7d0d4', glass: ['#bfe9fb', '#5aa6c6'], crate: '#d8a76a', crateFront: '#c38b4f', crateTop: '#7d5530',
+    counterTop: '#f6f1e6', counterFront: '#c98b58', counterPanel: '#b77a49', apron: '#2f9e72', cap: '#2f9e72', label: '#fff',
+    cat: { dosirak: '#f08a24', ramen: '#e04848', snack: '#e9a919', drink: '#2f8fd6' }, neon: false, dim: 0, lamp: '255,200,130' },
+  neon: { name: '네온 심야', desc: '도시의 밤 편의점', ink: '#0d0b17', inkW: 1, bg: '#0d0b17', shadow: 'rgba(0,0,0,.35)',
+    floor: 'tile', floorA: '#28244a', floorB: '#221e40', seam: 'rgba(45,226,230,.10)', storage: '#2b2838', plinth: '#2a2540', rug: '#1c2a3f', rugLine: '#2de2e6', spot: 'rgba(45,226,230,.16)', mat: '#151225',
+    wall: '#1d1a33', wallLow: '#15132a', lowH: 14, stripe1: '#ff3ea5', stripe2: '#2de2e6', storeWall: '#2a2638', storeLow: '#211e2e', rack: '#4a4560', box1: '#6b5a7a', box2: '#5a4a6a',
+    sign: '#140f26', signText: '#ff7ad1', signName: '점장 편의점', tag: '#2de2e6', tagText: '24H', frame: '#3a3560', clock: '#e8e6ff', poster: '#ff3ea5', posterText: '#fff',
+    part: '#3a3560', shelfTop: '#2e2a48', shelfFront: '#24203c', board: '#3d3860', chiller: '#2e2a48', chillerFront: '#1e1b33', chillerIn: ['#4fd8ff', '#173a66'],
+    cooler: '#2e2a48', coolerTop: '#3d3860', glass: ['#5fe0ff', '#1d3f73'], crate: '#5a4a6a', crateFront: '#4a3c5a', crateTop: '#2a2238',
+    counterTop: '#2e2a48', counterFront: '#3d2f5c', counterPanel: '#4b3a70', apron: '#ff3ea5', cap: '#2de2e6', label: '#fff',
+    cat: { dosirak: '#ff9f43', ramen: '#ff4d6d', snack: '#ffd84d', drink: '#3de0ff' }, neon: true, dim: 0.35, lamp: '255,110,199' },
+  retro: { name: '동네 구멍가게', desc: '90년대 나무 슈퍼', ink: '#4a2e1c', inkW: 1, bg: '#2b1d14', shadow: 'rgba(60,30,10,.2)',
+    floor: 'plank', floorA: '#c99462', floorB: '#b9824f', seam: '#8a5a35', storage: '#9c8a72', plinth: '#a5774a', rug: '#ecdcae', rugLine: '#c8322a', spot: 'rgba(200,50,42,.14)', mat: '#7a3b2e',
+    wall: '#f3e6c8', wallLow: '#4f7a4a', lowH: 34, stripe1: '#c8322a', stripe2: '#f3c13a', storeWall: '#cdb48c', storeLow: '#a88a5e', rack: '#6b4a2b', box1: '#d8a76a', box2: '#c99558',
+    sign: '#c8322a', signText: '#fff6d5', signName: '점장슈퍼', tag: '#f3c13a', tagText: '연중무휴', frame: '#7a4b2a', clock: '#fff6d5', poster: '#fff6d5', posterText: '#c8322a',
+    part: '#7a5233', shelfTop: '#e2bd86', shelfFront: '#c99a62', board: '#9a6a3c', chiller: '#e9e1cc', chillerFront: '#d8cdb2', chillerIn: ['#cfeff2', '#6aa6a8'],
+    cooler: '#d8cdb2', coolerTop: '#bfb294', glass: ['#d6f1f2', '#7ab3b5'], crate: '#d8a76a', crateFront: '#c38b4f', crateTop: '#7d5530',
+    counterTop: '#e2bd86', counterFront: '#8b5a33', counterPanel: '#7a4b2a', apron: '#c8322a', cap: '#c8322a', label: '#fff6d5',
+    cat: { dosirak: '#d9772b', ramen: '#c8322a', snack: '#c9961a', drink: '#2f6fa8' }, neon: false, dim: 0, lamp: '255,190,110' },
+  pastel: { name: '파스텔', desc: '선 없이 부드럽게', ink: '#8a7f99', inkW: 0, bg: '#e9e1f0', shadow: 'rgba(120,100,150,.13)',
+    floor: 'tile', floorA: '#fbf6f1', floorB: '#f4ece8', seam: 'rgba(0,0,0,0)', storage: '#ece3dc', plinth: '#efe6ee', rug: '#e3f1ec', rugLine: '#cfe6de', spot: 'rgba(150,200,185,.25)', mat: '#d9cde6',
+    wall: '#f6e8ef', wallLow: '#efd9e4', lowH: 14, stripe1: '#b9a6e8', stripe2: '#ffc9a8', storeWall: '#f1e4d6', storeLow: '#e8d6c4', rack: '#cbb7a4', box1: '#f2d3b0', box2: '#ebc49d',
+    sign: '#b9a6e8', signText: '#fff', signName: '점장 편의점', tag: '#ffb3a0', tagText: '24H', frame: '#ffffff', clock: '#ffffff', poster: '#ffe7a3', posterText: '#e0828f',
+    part: '#d9cde6', shelfTop: '#ffffff', shelfFront: '#f3eef6', board: '#e6dfec', chiller: '#ffffff', chillerFront: '#f1f4f8', chillerIn: ['#d6f0fb', '#a9d3ea'],
+    cooler: '#ffffff', coolerTop: '#ece6f2', glass: ['#e1f4fb', '#a9d3ea'], crate: '#f2d3b0', crateFront: '#e8c39b', crateTop: '#c99f78',
+    counterTop: '#ffffff', counterFront: '#f2c9b8', counterPanel: '#ebb9a5', apron: '#8fd3bd', cap: '#8fd3bd', label: '#4b3f5c',
+    cat: { dosirak: '#ffb38a', ramen: '#ff8fa3', snack: '#ffd479', drink: '#8ec5ff' }, neon: false, dim: 0, lamp: '255,220,200' },
+};
+const THEME_KEY = 'csm-theme';
+let themeKey = 'cartoon';
+try { if (THEMES[localStorage.getItem(THEME_KEY)]) themeKey = localStorage.getItem(THEME_KEY); } catch (e) { /* storage blocked */ }
+let T = THEMES[themeKey], INK = T.ink, CAT_COL = T.cat;
+function setTheme(k) {
+  themeKey = k; T = THEMES[k]; INK = T.ink; CAT_COL = T.cat;
+  document.documentElement.style.setProperty('--stagebg', T.bg);
+  try { localStorage.setItem(THEME_KEY, k); } catch (e) { /* storage blocked */ }
+}
+setTheme(themeKey);
+function glowOn(col, b = 12) { if (T.neon) { ctx.shadowColor = col; ctx.shadowBlur = b; } }
+function glowOff() { ctx.shadowBlur = 0; }
 const py = y => TOP + y * SY;
 const feet = y => py(y + 10);
-const CAT_COL = { dosirak: '#f08a24', ramen: '#e04848', snack: '#e9a919', drink: '#2f8fd6' };
 let shX = 0, shY = 0, doorT = 0;
 const GEO = {};
 function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
 function floorMode() { ctx.setTransform(DPR, 0, 0, DPR * SY, shX * DPR, (TOP + shY) * DPR); }
 function screenMode() { ctx.setTransform(DPR, 0, 0, DPR, shX * DPR, shY * DPR); }
-function ink(w = 2) { ctx.strokeStyle = INK; ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.stroke(); }
+function ink(w = 2) { if (!T.inkW) return; ctx.strokeStyle = INK; ctx.lineWidth = w * T.inkW; ctx.lineJoin = 'round'; ctx.stroke(); }
 function shade(hex, f) {
   const n = parseInt(hex.slice(1), 16);
   return `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f))})`;
@@ -1101,7 +1150,7 @@ function blob(x, y, w, h, r, fill, line = 2) { rr(x, y, w, h, r); ctx.fillStyle 
 // a box standing on the floor: footprint r, height z. front(u, v) / top(u, v) map 0..1 face coordinates to the screen.
 function prism(r, z, col, opt = {}) {
   const x0 = r.x, w = r.w, b0 = py(r.y), b1 = py(r.y + r.h), t0 = b0 - z, t1 = b1 - z;
-  ctx.fillStyle = 'rgba(40,30,20,.16)'; rr(x0 + 3, b0 - 2, w + 6, b1 - b0 + 8, 6); ctx.fill();
+  ctx.fillStyle = T.shadow; rr(x0 + 3, b0 - 2, w + 6, b1 - b0 + 8, 6); ctx.fill();
   ctx.fillStyle = opt.front || shade(col, -0.15); ctx.fillRect(x0, t1, w, z);
   ctx.fillStyle = opt.top || col; ctx.fillRect(x0, t0, w, b1 - b0);
   ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x0, t1 - 1, w, 2);
@@ -1115,23 +1164,23 @@ function drawItem(cat, x, y, s = 1) {
   ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
   ctx.lineWidth = 1.4 / s; ctx.strokeStyle = INK; ctx.lineJoin = 'round';
   if (cat === 'dosirak') {
-    rr(-10, -9, 20, 9, 2); ctx.fillStyle = '#3a3a3a'; ctx.fill(); ctx.stroke();
+    rr(-10, -9, 20, 9, 2); ctx.fillStyle = '#3a3a3a'; ctx.fill(); if (T.inkW) ctx.stroke();
     ctx.fillStyle = '#fbf7ec'; ctx.fillRect(-8.5, -7.5, 8, 6);
     ctx.fillStyle = '#e76f51'; ctx.fillRect(0.5, -7.5, 4, 3);
     ctx.fillStyle = '#7bc043'; ctx.fillRect(4.5, -7.5, 4, 3);
     ctx.fillStyle = '#f4d35e'; ctx.fillRect(0.5, -4.5, 8, 3);
   } else if (cat === 'ramen') {
     ctx.beginPath(); ctx.moveTo(-7, -14); ctx.lineTo(7, -14); ctx.lineTo(5, 0); ctx.lineTo(-5, 0); ctx.closePath();
-    ctx.fillStyle = '#e04848'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e04848'; ctx.fill(); if (T.inkW) ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.fillRect(-6.2, -10, 12.4, 3.5);
-    rr(-8, -16.5, 16, 3, 1); ctx.fillStyle = '#f5f5f5'; ctx.fill(); ctx.stroke();
+    rr(-8, -16.5, 16, 3, 1); ctx.fillStyle = '#f5f5f5'; ctx.fill(); if (T.inkW) ctx.stroke();
   } else if (cat === 'snack') {
-    rr(-7.5, -17, 15, 17, 3); ctx.fillStyle = '#f2b632'; ctx.fill(); ctx.stroke();
+    rr(-7.5, -17, 15, 17, 3); ctx.fillStyle = '#f2b632'; ctx.fill(); if (T.inkW) ctx.stroke();
     ctx.fillStyle = '#d18b0b'; ctx.fillRect(-6.5, -16, 13, 2); ctx.fillRect(-6.5, -3, 13, 2);
     ctx.beginPath(); ctx.arc(0, -8.5, 3.6, 0, Math.PI * 2); ctx.fillStyle = '#fff4cc'; ctx.fill();
   } else {
-    rr(-5, -16, 10, 16, 3); ctx.fillStyle = '#62c2ec'; ctx.fill(); ctx.stroke();
-    rr(-3, -20, 6, 4, 1); ctx.fillStyle = '#e04848'; ctx.fill(); ctx.stroke();
+    rr(-5, -16, 10, 16, 3); ctx.fillStyle = '#62c2ec'; ctx.fill(); if (T.inkW) ctx.stroke();
+    rr(-3, -20, 6, 4, 1); ctx.fillStyle = '#e04848'; ctx.fill(); if (T.inkW) ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.fillRect(-4.3, -11, 8.6, 4);
     ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(-3, -14.5, 1.6, 12);
   }
@@ -1153,21 +1202,29 @@ function stockRows(g, cat, rows, s, inset = 0.06) {
 function lightLevel() { const h = G.time / 60; return h < 17 ? 0 : h < 20 ? (h - 17) / 3 : 1; }
 function drawFloor() {
   floorMode();
-  ctx.fillStyle = '#3b3640'; ctx.fillRect(0, 0, W, H);
-  for (let y = 20; y < 580; y += 40) for (let x = 20; x < 940; x += 40) {
-    ctx.fillStyle = ((x + y) / 40) % 2 ? '#f5ecda' : '#ede2cb';
-    ctx.fillRect(x, y, 40, 40);
+  ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
+  if (T.floor === 'plank') {
+    for (let y = 20, r = 0; y < 580; y += 20, r++) for (let x = 20 - (r % 3) * 30; x < 940; x += 90) {
+      ctx.fillStyle = (Math.floor(x / 90) + r) % 2 ? T.floorA : T.floorB; ctx.fillRect(x, y, 90, 20);
+      ctx.fillStyle = T.seam; ctx.fillRect(x, y, 2, 20); ctx.fillRect(x, y, 90, 1.5);
+    }
+  } else {
+    for (let y = 20; y < 580; y += 40) for (let x = 20; x < 940; x += 40) {
+      ctx.fillStyle = ((x + y) / 40) % 2 ? T.floorA : T.floorB;
+      ctx.fillRect(x, y, 40, 40);
+      ctx.fillStyle = T.seam; ctx.fillRect(x, y, 40, 1.5); ctx.fillRect(x, y, 1.5, 40);
+    }
   }
-  ctx.fillStyle = '#cfc5b3'; ctx.fillRect(20, 20, 340, 105);
-  ctx.fillStyle = '#d9cfbd'; ctx.fillRect(880, 130, 60, 300);
+  ctx.fillStyle = T.storage; ctx.fillRect(20, 20, 340, 105);
+  ctx.fillStyle = T.plinth; ctx.fillRect(880, 130, 60, 300);
   for (let x = 20; x < 360; x += 34) { ctx.fillStyle = 'rgba(0,0,0,.05)'; ctx.fillRect(x, 20, 1.5, 105); }
-  for (let x = 300; x < 360; x += 12) { ctx.fillStyle = (x / 12) % 2 ? '#f2c230' : '#3b3640'; ctx.fillRect(x, 120, 12, 5); }
+  for (let x = 300; x < 360; x += 12) { ctx.fillStyle = (x / 12) % 2 ? '#f2c230' : '#2b2b2b'; ctx.fillRect(x, 120, 12, 5); }
   // checkout area rug and queue spots
-  ctx.fillStyle = '#d9e8df'; rr(24, 139, 242, 147, 10); ctx.fill();
-  ctx.strokeStyle = '#bcd3c6'; ctx.lineWidth = 3; ctx.stroke();
-  for (let i = 0; i < 5; i++) { const [x, y] = slotPos(i); ctx.fillStyle = 'rgba(47,158,114,.18)'; rr(x - 17, y - 4, 34, 26, 8); ctx.fill(); }
+  ctx.fillStyle = T.rug; rr(24, 139, 242, 147, 10); ctx.fill();
+  ctx.strokeStyle = T.rugLine; ctx.lineWidth = 3; glowOn(T.rugLine, 10); ctx.stroke(); glowOff();
+  for (let i = 0; i < 5; i++) { const [x, y] = slotPos(i); ctx.fillStyle = T.spot; rr(x - 17, y - 4, 34, 26, 8); ctx.fill(); }
   // entrance mat
-  ctx.fillStyle = '#4d5f68'; rr(772, 506, 96, 70, 8); ctx.fill();
+  ctx.fillStyle = T.mat; rr(772, 506, 96, 70, 8); ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 3;
   for (let x = 784; x < 862; x += 12) { ctx.beginPath(); ctx.moveTo(x, 514); ctx.lineTo(x, 568); ctx.stroke(); }
   if (G.ship) drawShipZone(G.ship);
@@ -1191,7 +1248,7 @@ function drawShipZone(s) {
 
 // ---- back wall: brand stripe, storage racks, clock, sign, window with the time of day ----
 function skyCols() {
-  const h = G.time / 60;
+  const h = T.neon ? 24 : G.time / 60;
   const day = ['#79c4f0', '#d3eefc'], dusk = ['#ef8a4f', '#ffd6a0'], night = ['#141a3c', '#2d3a6e'];
   if (h < 16) return day;
   if (h < 18.5) { const t = (h - 16) / 2.5; return [mix(day[0], dusk[0], t), mix(day[1], dusk[1], t)]; }
@@ -1199,33 +1256,35 @@ function skyCols() {
 }
 function drawBackWall() {
   screenMode();
-  const b = py(20), lit = lightLevel();
-  ctx.fillStyle = '#cfeadf'; ctx.fillRect(0, 0, W, b);
-  ctx.fillStyle = '#2f9e72'; ctx.fillRect(0, 0, W, 12);
-  ctx.fillStyle = '#f2a33a'; ctx.fillRect(0, 12, W, 6);
-  ctx.fillStyle = '#b8d9cc'; ctx.fillRect(0, b - 14, W, 14);
+  const b = py(20), lit = T.neon ? 1 : lightLevel();
+  ctx.fillStyle = T.wall; ctx.fillRect(0, 0, W, b);
+  glowOn(T.stripe1); ctx.fillStyle = T.stripe1; ctx.fillRect(0, 0, W, 12);
+  glowOn(T.stripe2); ctx.fillStyle = T.stripe2; ctx.fillRect(0, 12, W, 6); glowOff();
+  ctx.fillStyle = T.wallLow; ctx.fillRect(0, b - T.lowH, W, T.lowH);
   // storage wall with racks of stock
-  ctx.fillStyle = '#d6c7ae'; ctx.fillRect(20, 18, 340, b - 18);
-  ctx.fillStyle = '#c2b298'; ctx.fillRect(20, b - 14, 340, 14);
+  ctx.fillStyle = T.storeWall; ctx.fillRect(20, 18, 340, b - 18);
+  ctx.fillStyle = T.storeLow; ctx.fillRect(20, b - 14, 340, 14);
   for (const ry of [58, 96]) {
-    ctx.fillStyle = '#8a7a64'; ctx.fillRect(34, ry, 312, 5);
-    for (let i = 0; i < 8; i++) blob(40 + i * 38, ry - 22 + (i % 2) * 4, 30, 22 - (i % 2) * 4, 3, i % 3 ? '#d8a76a' : '#c99558', 1.5);
+    ctx.fillStyle = T.rack; ctx.fillRect(34, ry, 312, 5);
+    for (let i = 0; i < 8; i++) blob(40 + i * 38, ry - 22 + (i % 2) * 4, 30, 22 - (i % 2) * 4, 3, i % 3 ? T.box1 : T.box2, 1.5);
   }
-  ctx.fillStyle = '#8a7a64'; ctx.fillRect(34, 30, 4, 74); ctx.fillRect(342, 30, 4, 74);
+  ctx.fillStyle = T.rack; ctx.fillRect(34, 30, 4, 74); ctx.fillRect(342, 30, 4, 74);
   // clock
   const cx = 410, cy = 62, m = G.time;
-  ellipse(cx, cy, 20, 20, '#fffdf6', 3);
+  ellipse(cx, cy, 20, 20, T.clock, 3);
   ctx.strokeStyle = INK; ctx.lineCap = 'round';
   const hand = (a, len, w) => { ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.sin(a) * len, cy - Math.cos(a) * len); ctx.stroke(); };
   hand((m / 60 % 12) / 12 * Math.PI * 2, 9, 3); hand((m % 60) / 60 * Math.PI * 2, 14, 2);
   ctx.lineCap = 'butt';
   // shop sign above the chiller, lit after dark
-  ctx.save(); ctx.shadowColor = `rgba(255,220,120,${lit * 0.9})`; ctx.shadowBlur = lit * 18;
-  blob(478, 18, 244, 28, 8, '#2f9e72', 3); ctx.restore();
+  ctx.save(); ctx.shadowColor = T.neon ? T.signText : `rgba(255,220,120,${lit * 0.9})`; ctx.shadowBlur = T.neon ? 14 : lit * 18;
+  blob(478, 18, 244, 28, 8, T.sign, 3); ctx.restore();
   rr(478, 18, 244, 28, 8); ink(3);
-  ctx.fillStyle = '#fff'; ctx.font = `21px ${DISPLAY}`; ctx.textAlign = 'center'; ctx.fillText('점장 편의점', 585, 40);
-  blob(668, 22, 46, 20, 10, '#f2a33a', 2);
-  ctx.fillStyle = '#fff'; ctx.font = `900 13px ${FONT}`; ctx.fillText('24H', 691, 37);
+  ctx.font = `900 12px ${FONT}`; const tw = ctx.measureText(T.tagText).width + 18;
+  ctx.fillStyle = T.signText; ctx.font = `21px ${DISPLAY}`; ctx.textAlign = 'center';
+  glowOn(T.signText, 14); ctx.fillText(T.signName, 600 - tw / 2, 40); glowOff();
+  glowOn(T.tag); blob(716 - tw, 22, tw, 20, 10, T.tag, 2); glowOff();
+  ctx.fillStyle = T.neon ? '#0d0b17' : '#fff'; ctx.font = `900 12px ${FONT}`; ctx.fillText(T.tagText, 716 - tw / 2, 36.5);
   // window
   const [s0, s1] = skyCols(), wx = 780, wy = 30, ww = 150, wh = 66;
   const g = ctx.createLinearGradient(0, wy, 0, wy + wh); g.addColorStop(0, s0); g.addColorStop(1, s1);
@@ -1234,12 +1293,12 @@ function drawBackWall() {
   ctx.fillStyle = mix('#8fa6b5', '#0e1430', lit);
   [[0, 24, 28], [28, 16, 22], [50, 32, 34], [84, 20, 22], [106, 34, 26], [132, 22, 18]].forEach(([x, hh, w]) => ctx.fillRect(wx + x, wy + wh - hh, w, hh));
   if (lit > 0.3) { ctx.fillStyle = `rgba(255,214,120,${lit})`; for (let i = 0; i < 14; i++) ctx.fillRect(wx + 5 + (i * 23) % 140, wy + wh - 7 - (i * 7) % 16, 3, 3); }
-  ctx.beginPath(); ctx.rect(wx, wy, ww, wh); ctx.lineWidth = 6; ctx.strokeStyle = '#fffdf6'; ctx.stroke();
+  ctx.beginPath(); ctx.rect(wx, wy, ww, wh); ctx.lineWidth = 6; ctx.strokeStyle = T.frame; ctx.stroke();
   ctx.beginPath(); ctx.rect(wx - 3, wy - 3, ww + 6, wh + 6); ink(2);
-  ctx.beginPath(); ctx.moveTo(wx + ww / 2, wy); ctx.lineTo(wx + ww / 2, wy + wh); ctx.lineWidth = 4; ctx.strokeStyle = '#fffdf6'; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(wx + ww / 2, wy); ctx.lineTo(wx + ww / 2, wy + wh); ctx.lineWidth = 4; ctx.strokeStyle = T.frame; ctx.stroke();
   // sale poster
-  blob(386, 88, 50, 22, 4, '#ffd84d', 2);
-  ctx.fillStyle = '#e04848'; ctx.font = `900 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('1+1', 411, 104);
+  glowOn(T.poster); blob(386, 88, 50, 22, 4, T.poster, 2); glowOff();
+  ctx.fillStyle = T.posterText; ctx.font = `900 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('1+1', 411, 104);
 }
 
 // ---- fixtures ----
@@ -1249,43 +1308,44 @@ function shelfSign(cat, x, y) {
   const txt = `${NAME[cat]} ${st}/${MAXSTOCK}`;
   ctx.font = `900 12px ${FONT}`; ctx.textAlign = 'center';
   const w = ctx.measureText(txt).width + 34;
-  blob(x - w / 2, y - 22, w, 22, 11, empty ? (blink ? '#ff6b6b' : '#c73a3a') : low ? '#f2a33a' : CAT_COL[cat], 2);
+  const bg = empty ? (blink ? '#ff6b6b' : '#c73a3a') : low ? '#f2a33a' : CAT_COL[cat];
+  glowOn(bg); blob(x - w / 2, y - 22, w, 22, 11, bg, 2); glowOff();
   drawItem(cat, x - w / 2 + 13, y - 4, 0.7);
-  ctx.fillStyle = '#fff'; ctx.fillText(txt, x + 8, y - 7);
+  ctx.fillStyle = empty || low ? '#fff' : T.label; ctx.fillText(txt, x + 8, y - 7);
 }
 function drawGondola(cat) {
   const s = SHELF[cat], col = CAT_COL[cat];
-  const g = GEO[cat] = prism(s, 54, mix('#f4f4f1', col, 0.12), { front: '#e6e8e3' });
+  const g = GEO[cat] = prism(s, 54, mix(T.shelfTop, col, 0.12), { front: T.shelfFront });
   for (const v of [0.12, 0.56]) {
     const [x, y] = g.front(0, v);
-    ctx.fillStyle = '#c4c9c3'; ctx.fillRect(x + 3, y, g.w - 6, 3);
-    ctx.fillStyle = col; ctx.fillRect(x + 3, y + 3, g.w - 6, 3);
+    ctx.fillStyle = T.board; ctx.fillRect(x + 3, y, g.w - 6, 3);
+    glowOn(col, 8); ctx.fillStyle = col; ctx.fillRect(x + 3, y + 3, g.w - 6, 3); glowOff();
   }
   stockRows(g, cat, [0.12, 0.56], 1.25);
-  ctx.fillStyle = col; ctx.fillRect(g.x0 + 1, g.b1 - 6, g.w - 2, 5);
+  glowOn(col); ctx.fillStyle = col; ctx.fillRect(g.x0 + 1, g.b1 - 6, g.w - 2, 5); glowOff();
   shelfSign(cat, g.x0 + g.w / 2, g.t1 - 5);
 }
 function drawChiller() {
   const cat = 'dosirak', s = SHELF[cat];
-  const g = GEO[cat] = prism(s, 80, '#eef3f3', { front: '#dfe7e8' });
+  const g = GEO[cat] = prism(s, 80, T.chiller, { front: T.chillerFront });
   // open refrigerated case: lit interior inside a frame
   const ix = g.x0 + 10, iy = g.t1 + 14, iw = g.w - 20, ih = g.z - 26;
-  const lg = ctx.createLinearGradient(0, iy, 0, iy + ih); lg.addColorStop(0, '#9fdcf2'); lg.addColorStop(1, '#3f7f98');
-  blob(ix, iy, iw, ih, 4, lg, 2);
+  const lg = ctx.createLinearGradient(0, iy, 0, iy + ih); lg.addColorStop(0, T.chillerIn[0]); lg.addColorStop(1, T.chillerIn[1]);
+  glowOn(T.chillerIn[0], 16); blob(ix, iy, iw, ih, 4, lg, 2); glowOff();
   for (const v of [0.18, 0.56]) { const [x, y] = g.front(0, v); ctx.fillStyle = '#e8f6fb'; ctx.fillRect(ix + 2, y, iw - 4, 3); }
   stockRows(g, cat, [0.18, 0.56], 1.05, 0.08);
-  ctx.fillStyle = CAT_COL[cat]; ctx.fillRect(g.x0 + 1, g.b1 - 7, g.w - 2, 6);
+  glowOn(CAT_COL[cat]); ctx.fillStyle = CAT_COL[cat]; ctx.fillRect(g.x0 + 1, g.b1 - 7, g.w - 2, 6); glowOff();
   shelfSign(cat, g.x0 + g.w / 2, g.t1 + 13);
 }
 const COOLERS = [0, 1, 2].map(i => ({ x: 885, y: 140 + i * 280 / 3, w: 55, h: 280 / 3 }));
 function drawCooler(i) {
   // the drink wall is three glass-door coolers facing the shop
-  const cat = 'drink', c = COOLERS[i], g = prism({ x: c.x, y: c.y + c.h - 10, w: c.w, h: 10 }, 76, '#e9eef0', { top: '#c7d0d4' });
+  const cat = 'drink', c = COOLERS[i], g = prism({ x: c.x, y: c.y + c.h - 10, w: c.w, h: 10 }, 76, T.cooler, { top: T.coolerTop });
   if (i === 0) { GEO[cat] = { x0: g.x0, w: g.w, t0: g.t0 }; shelfSign(cat, g.x0 + g.w / 2 - 22, g.t0 - 4); }
   if (i === 2) GEO[cat].b1 = g.b1;
   const dx = g.x0 + 5, dy = g.t1 + 6, dw = g.w - 10, dh = g.z - 12;
-  const lg = ctx.createLinearGradient(0, dy, 0, dy + dh); lg.addColorStop(0, '#bfe9fb'); lg.addColorStop(1, '#5aa6c6');
-  blob(dx, dy, dw, dh, 3, lg, 2);
+  const lg = ctx.createLinearGradient(0, dy, 0, dy + dh); lg.addColorStop(0, T.glass[0]); lg.addColorStop(1, T.glass[1]);
+  glowOn(T.glass[0], 14); blob(dx, dy, dw, dh, 3, lg, 2); glowOff();
   const per = Math.ceil(MAXSTOCK / 3), rows = Math.ceil(per / 2);
   for (let k = 0; k < per; k++) {
     const idx = i * per + k; if (idx >= G.stock[cat]) break;
@@ -1293,23 +1353,23 @@ function drawCooler(i) {
     drawItem(cat, dx + dw * (col ? 0.72 : 0.28), dy + dh * (row + 1) / rows - 3, 0.95);
   }
   ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.moveTo(dx + 4, dy + dh); ctx.lineTo(dx + 14, dy); ctx.lineTo(dx + 20, dy); ctx.lineTo(dx + 10, dy + dh); ctx.fill();
-  blob(dx + dw - 6, dy + dh / 2 - 9, 3, 18, 1.5, '#fffdf6', 1.5);
+  blob(dx + dw - 6, dy + dh / 2 - 9, 3, 18, 1.5, T.frame, 1.5);
 }
 function drawCrate(cat) {
   // open bin of stock in the storage room
-  const c = CRATE[cat], g = GEO['crate_' + cat] = prism(c, 24, '#d8a76a', { front: '#c38b4f', top: '#7d5530' });
+  const c = CRATE[cat], g = GEO['crate_' + cat] = prism(c, 24, T.crate, { front: T.crateFront, top: T.crateTop });
   for (let k = 0; k < 3; k++) drawItem(cat, g.x0 + 14 + k * 13, g.t0 + 20 + (k % 2) * 4, 0.85);
   ctx.beginPath(); ctx.rect(g.x0, g.t0, g.w, g.b1 - g.b0); ink(2);
   blob(g.x0 + g.w / 2 - 13, g.t1 + 5, 26, 14, 3, CAT_COL[cat], 1.5);
-  ctx.fillStyle = '#fff'; ctx.font = `900 9px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(NAME[cat], g.x0 + g.w / 2, g.t1 + 15);
+  ctx.fillStyle = T.label; ctx.font = `900 9px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(NAME[cat], g.x0 + g.w / 2, g.t1 + 15);
   if (G.free[cat] > 0) {
     blob(g.x1 - 22, g.t0 - 10, 30, 17, 8.5, '#2f9e72', 2);
     ctx.fillStyle = '#fff'; ctx.font = `900 11px ${FONT}`; ctx.fillText(`+${G.free[cat]}`, g.x1 - 7, g.t0 + 3);
   }
 }
 function drawCounter() {
-  const g = prism(COUNTER, 42, '#f6f1e6', { front: '#c98b58' });
-  for (let x = g.x0 + 12; x < g.x1 - 20; x += 54) blob(x, g.t1 + 10, 44, g.z - 18, 4, '#b77a49', 1.5);
+  const g = prism(COUNTER, 42, T.counterTop, { front: T.counterFront });
+  for (let x = g.x0 + 12; x < g.x1 - 20; x += 54) blob(x, g.t1 + 10, 44, g.z - 18, 4, T.counterPanel, 1.5);
   // microwave
   const top = py(300) - 42, heat = G.mini && G.mini.phase === 'heat';
   blob(30, top - 26, 54, 28, 4, '#4a5058', 2);
@@ -1339,7 +1399,7 @@ function drawDoor() {
   }
 }
 function drawShipBox(b) {
-  const g = prism({ x: b.x - 15, y: b.y - 8, w: 30, h: 18 }, 22, '#d8a76a', { front: '#c38b4f' });
+  const g = prism({ x: b.x - 15, y: b.y - 8, w: 30, h: 18 }, 22, T.crate, { front: T.crateFront });
   ctx.fillStyle = '#efd5a5'; ctx.fillRect(g.x0 + g.w / 2 - 3, g.t0 + 1, 6, g.b1 - g.b0 - 1);
   const [x, y] = g.front(0.5, 0.12); drawItem(b.cat, x, y, 0.8);
 }
@@ -1354,7 +1414,7 @@ function drawPerson(x, y, o) {
   // (x, y) = screen position of the feet
   const t = o.walk || 0, sw = Math.sin(t) * 2.5, bob = Math.abs(Math.cos(t)) * 1.5, by = y - bob;
   const l1 = Math.max(0, sw), l2 = Math.max(0, -sw), f = o.face || 0;
-  ellipse(x, y, 14, 5, 'rgba(40,30,20,.22)');
+  ellipse(x, y, 14, 5, T.shadow);
   const pants = o.pants || '#3d4a5c';
   blob(x - 8, by - 11 - l1, 7, 10, 3, pants, 1.8);
   blob(x + 1, by - 11 - l2, 7, 10, 3, pants, 1.8);
@@ -1362,7 +1422,7 @@ function drawPerson(x, y, o) {
   ellipse(x - 13, by - 15 + l2 * 0.7, 3.6, 3.6, o.skin, 1.8);
   ellipse(x + 13, by - 15 + l1 * 0.7, 3.6, 3.6, o.skin, 1.8);
   blob(x - 12, by - 29, 24, 21, 9, o.shirt, 2);
-  if (o.apron) { blob(x - 8, by - 24, 16, 15, 4, '#2f9e72', 1.5); ctx.fillStyle = '#fff'; ctx.fillRect(x - 4, by - 20, 8, 3); }
+  if (o.apron) { blob(x - 8, by - 24, 16, 15, 4, T.apron, 1.5); ctx.fillStyle = '#fff'; ctx.fillRect(x - 4, by - 20, 8, 3); }
   const hx = x + f * 2, hy = by - 40;
   if (o.hood) ellipse(x, hy, 15, 14, '#262a33', 2);
   ellipse(hx, hy, 12.5, 12, o.skin);
@@ -1372,7 +1432,7 @@ function drawPerson(x, y, o) {
   }
   ellipse(hx, hy, 12.5, 12, null, 2);
   const ex = hx + f * 3.5;
-  ellipse(ex - 4, hy + 2, 1.8, 2.3, INK); ellipse(ex + 4, hy + 2, 1.8, 2.3, INK);
+  ellipse(ex - 4, hy + 2, 1.8, 2.3, '#2e2a33'); ellipse(ex + 4, hy + 2, 1.8, 2.3, '#2e2a33');
   ellipse(ex - 7, hy + 6, 2.6, 1.6, o.blush ? 'rgba(235,70,70,.75)' : 'rgba(240,120,120,.4)');
   ellipse(ex + 7, hy + 6, 2.6, 1.6, o.blush ? 'rgba(235,70,70,.75)' : 'rgba(240,120,120,.4)');
   if (o.cap && !o.hood) {
@@ -1446,7 +1506,7 @@ function drawPlayer() {
   // a pulsing ring marks the player in a crowd
   const pulse = 1 + Math.sin(performance.now() / 250) * 0.06;
   ctx.beginPath(); ctx.ellipse(p.x, y, 20 * pulse, 8 * pulse, 0, 0, Math.PI * 2); ctx.strokeStyle = '#ffc23d'; ctx.lineWidth = 3; ctx.stroke();
-  drawPerson(p.x, y, { shirt: '#fbfbf7', skin: '#f2c8a0', hair: '#2b1d14', pants: '#2d3436', walk: p.walk, face: p.face, apron: true, capCol: '#2f9e72' });
+  drawPerson(p.x, y, { shirt: '#fbfbf7', skin: '#f2c8a0', hair: '#2b1d14', pants: '#2d3436', walk: p.walk, face: p.face, apron: true, capCol: T.cap });
   if (G.carry) {
     const ship = G.carry.kind === 'ship';
     const g = prism({ x: p.x - 16, y: (y - 60 - TOP) / SY, w: 32, h: 16 }, 22, '#d8a76a', { front: '#c38b4f' });
@@ -1478,13 +1538,13 @@ function drawShipTimer(s) {
   ctx.fillStyle = s.late ? '#e04848' : pct < 0.3 ? '#f2a33a' : '#3cbf8a'; rr(557.5, y - 3.5, 155 * (s.late ? 1 : pct), 6, 3); ctx.fill();
 }
 function drawLighting() {
-  const lit = lightLevel();
+  const lit = Math.max(lightLevel(), T.dim);
   if (!lit) return;
   ctx.fillStyle = `rgba(28,30,80,${lit * 0.32})`; ctx.fillRect(0, 0, W, H);
   ctx.globalCompositeOperation = 'lighter';
   for (const [x, y] of [[150, 210], [560, 140], [560, 280], [560, 440], [780, 320], [200, 470]]) {
     const sy = py(y), g = ctx.createRadialGradient(x, sy, 10, x, sy, 160);
-    g.addColorStop(0, `rgba(255,200,130,${lit * 0.14})`); g.addColorStop(1, 'rgba(255,200,130,0)');
+    g.addColorStop(0, `rgba(${T.lamp},${lit * (T.neon ? 0.2 : 0.14)})`); g.addColorStop(1, `rgba(${T.lamp},0)`);
     ctx.fillStyle = g; ctx.fillRect(x - 160, sy - 160, 320, 320);
   }
   ctx.globalCompositeOperation = 'source-over';
@@ -1499,11 +1559,11 @@ function drawCashierClerk() {
 }
 function draw() {
   const k = G.shake * 9; shX = (Math.random() - 0.5) * k; shY = (Math.random() - 0.5) * k;
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = '#3b3640'; ctx.fillRect(0, 0, W, H);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
   drawFloor();
   drawBackWall();
   // everything standing, painted back to front by where it touches the floor
-  const WALL = '#4f7f80';
+  const WALL = T.part;
   const ents = [
     { y: 65, f: drawChiller },
     { y: 135, f: () => drawWall({ x: 20, y: 125, w: 280, h: 10 }, 26, WALL) },
@@ -1598,28 +1658,32 @@ function showTitle() {
   mode = 'title';
   screenEl.hidden = false;
   screenEl.innerHTML = `<div class="card">
-    <span class="tag">PROTOTYPE v0.6.1</span>
+    <span class="tag">PROTOTYPE v0.7</span>
     <h1>나는 편의점 점장이다</h1>
     <p>오늘부터 당신이 이 가게의 점장. 박스를 나르고, 바코드를 찍고, 도시락을 데우고,<br>쏟아진 음료를 닦고, 도둑을 잡으세요. 08:00부터 22:00까지, 약 3분 30초의 하루.</p>
     <div class="shop" id="setup"></div>
     <div class="shop" id="save"></div>
     <button class="btn" id="startBtn" type="button">${savedDay.day > 1 ? `${savedDay.day}일차 이어서 영업` : '영업 시작'}</button>
     <p style="font-size:12px" class="keys">키보드: WASD·방향키 이동 / E·Space 행동 / Shift 달리기 / Q 계산 멈추기 / P 일시정지<br>휴대폰: 왼쪽 패드로 이동, 오른쪽 버튼으로 행동·달리기 (가로 화면 추천)<br>브라우저 메뉴에서 "홈 화면에 추가"를 하면 앱처럼 전체 화면으로 열려요</p>
+    <details class="howto"><summary>게임 방법 보기 ▾</summary><div class="help">${$('helpTpl').innerHTML}</div></details>
   </div>`;
   renderSetup(); renderSave();
   $('startBtn').onclick = () => startGame(savedDay);
-  $('startBtn').focus();
+  $('startBtn').focus({ preventScroll: true });
 }
 function renderSetup() {
   const el = $('setup'); if (!el) return;
   const sv = savedDay;
   const wage = STAFF.reduce((s, st) => s + (sv.staff[st.id] ? st.wage : 0), 0);
-  el.innerHTML = `<div class="shop-head"><b>난이도</b></div>
+  el.innerHTML = `<div class="shop-head"><b>디자인</b><span>뒤 화면에서 바로 미리 보여요</span></div>
+    <div class="seg">${Object.entries(THEMES).map(([k, t]) => `<button type="button" data-theme="${k}" class="${themeKey === k ? 'on' : ''}" aria-pressed="${themeKey === k}">${t.name}<small>${t.desc}</small></button>`).join('')}</div>
+    <div class="shop-head"><b>난이도</b></div>
     <div class="seg">${Object.entries(DIFF).map(([k, d]) => `<button type="button" data-diff="${k}" class="${sv.diff === k ? 'on' : ''}" aria-pressed="${sv.diff === k}">${d.name}<small>${d.desc}</small></button>`).join('')}</div>
     <div class="shop-head"><b>알바 고용</b><span>일당 합계 <b>${won(wage)}</b></span></div>
     ${STAFF.map(st => `<div class="up${sv.staff[st.id] ? ' owned' : ''}"><div class="up-txt"><b>${st.name} <small>일당 ${won(st.wage)}</small></b><small>${st.desc}</small></div>
       <button type="button" data-staff="${st.id}" class="${sv.staff[st.id] ? 'hired' : ''}" aria-pressed="${sv.staff[st.id]}">${sv.staff[st.id] ? '고용 중' : '고용'}</button></div>`).join('')}
     <p class="note">일당은 그날 영업이 끝나면 순이익에서 빠져요. 다시 누르면 내보낼 수 있어요.</p>`;
+  el.querySelectorAll('[data-theme]').forEach(b => b.onclick = () => { setTheme(b.dataset.theme); renderSetup(); });
   el.querySelectorAll('[data-diff]').forEach(b => b.onclick = () => { sv.diff = b.dataset.diff; storeSave(); renderSetup(); });
   el.querySelectorAll('[data-staff]').forEach(b => b.onclick = () => { sv.staff[b.dataset.staff] = !sv.staff[b.dataset.staff]; storeSave(); renderSetup(); });
 }
@@ -1706,7 +1770,7 @@ function endDay() {
   </div>`;
   renderShop(); renderSetup(); renderSave();
   $('nextBtn').onclick = () => startGame(savedDay);
-  $('nextBtn').focus();
+  $('nextBtn').focus({ preventScroll: true });
 }
 function renderShop() {
   const el = $('shop'); if (!el) return;
