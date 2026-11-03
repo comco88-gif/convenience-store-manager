@@ -112,6 +112,7 @@ canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:m
 .mrow.fail{color:var(--muted)}
 .unlock{margin:0!important;color:var(--sign)!important;font-weight:700}
 .guide{position:absolute;z-index:7;left:50%;top:calc(max(8px,env(safe-area-inset-top,0px)) + 56px);transform:translateX(-50%);display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100vw - 24px);background:#fffdf6;color:#2a1a00;border:3px solid var(--sign);border-radius:14px;padding:8px 10px 8px 12px;font-size:15px;box-shadow:0 5px 0 rgba(0,0,0,.25)}
+.guide small{display:block;font-size:13px;color:#6b5a2e;margin-top:2px}
 .guide .step{flex:none;background:var(--sign);border-radius:999px;padding:2px 9px;font-weight:900;font-size:12px}
 .guide button{flex:none;background:none;border:1px solid #c9b98f;color:#7a6a45;border-radius:8px;padding:4px 8px;font:inherit;font-size:12px;cursor:pointer}
 .item .ic img{width:28px;height:28px;display:block}
@@ -1347,18 +1348,51 @@ function updateMiniLive() {
 
 // ---------- first-day tutorial ----------
 // four guided steps before the clock starts on a brand-new save; the arrow in draw() points at step.at()
+// `stand` is where the player should end up (the footprint trail leads there), `sub` the hint for where they are right now
+const inStorage = p => p.x < 362 && p.y < 128;
+const DOOR_IN = { x: 330, y: 98 }, DOOR_OUT = { x: 330, y: 168 };
+const near = (p, q, r = 44) => dist(p.x, p.y, q.x, q.y) < r;
 const TUT = [
-  { text: '창고로 가서 <b>라면 상자</b>를 꺼내세요', at: () => ({ x: CRATE.ramen.x + 26, y: CRATE.ramen.y + 40 }),
+  { text: '창고에서 <b>라면 상자</b>를 꺼내 오세요', at: () => ({ x: CRATE.ramen.x + 26, y: CRATE.ramen.y + 40 }),
+    stand: () => ({ x: CRATE.ramen.x + 26, y: CRATE.ramen.y + 58 }),
+    sub: () => inStorage(G.player) ? '② 빨간 <b>라면</b> 상자 앞에 서서 행동 버튼을 누르세요'
+      : '① 창고 벽은 못 지나가요. 바닥의 <b>노란 발자국</b>을 따라 오른쪽 <b>창고 입구</b>로 들어가세요',
     start: () => { G.stock.ramen = 3; }, done: () => G.carry && G.carry.kind === 'box' && G.carry.cat === 'ramen' },
-  { text: '<b>라면 선반</b> 앞에서 행동 버튼을 <b>꾹</b> 눌러 진열하세요', at: () => ({ x: 580, y: SHELF.ramen.y + 40 }),
-    done: () => !G.carry || G.stock.ramen >= MAXSTOCK },
-  { text: '손님이 왔어요! 줄을 서면 <b>계산대</b>로 가서 계산하세요', at: () => ({ x: POS_SPOT[0], y: POS_SPOT[1] }),
+  { text: '<b>라면 선반</b>에 진열하세요', at: () => ({ x: 580, y: SHELF.ramen.y + 40 }), stand: () => ({ x: 580, y: SHELF.ramen.y + 62 }),
+    sub: () => inStorage(G.player) ? '① 상자를 들었어요! <b>노란 발자국</b>을 따라 창고 입구로 나가세요'
+      : G.target && G.target.type === 'restock' ? `③ 행동 버튼을 <b>계속 꾹</b> 누르고 있으세요 (상자에 ${G.carry ? G.carry.n : 0}개 남음)`
+      : '② 가운데 빨간 <b>라면 선반</b> 아래쪽 앞으로 가세요',
+    // putting the box back in the crate instead of shelving it sends the player back to step 1
+    back: () => !G.carry && G.stock.ramen <= 3, done: () => (!G.carry && G.stock.ramen > 3) || G.stock.ramen >= MAXSTOCK },
+  { text: '첫 손님을 <b>계산</b>하세요', at: () => ({ x: POS_SPOT[0], y: POS_SPOT[1] }), stand: () => ({ x: POS_SPOT[0], y: POS_SPOT[1] }),
+    sub: () => G.mini ? '계산 창의 안내대로: 노란 칸의 방향키 → 결제'
+      : near(G.player, { x: POS_SPOT[0], y: POS_SPOT[1] }) ? (G.queue[0] && G.queue[0].atSlot ? '손님이 왔어요! 행동 버튼을 눌러 <b>계산 시작</b>' : '손님이 라면을 고르는 중이에요. 여기서 잠깐 기다리세요')
+      : '<b>노란 발자국</b>을 따라 계산대 뒤 <b>NEXT</b> 화면 앞으로 가세요',
     start: () => spawnCustomer({ wants: ['ramen'] }), done: () => G.stats.served >= 1 },
-  { text: '음료가 쏟아졌어요! 웅덩이 위에서 행동 버튼을 <b>꾹</b> 눌러 닦으세요', at: () => G.puddles[0] || G.player,
+  { text: '쏟아진 음료를 <b>닦으세요</b>', at: () => G.puddles[0] || G.player, stand: () => G.puddles[0] || G.player,
+    sub: () => G.target && G.target.type === 'clean' ? '물이 다 없어질 때까지 행동 버튼을 <b>계속 꾹</b>'
+      : '<b>노란 발자국</b>을 따라 파란 웅덩이 위로 가세요',
     start: () => spawnPuddle(330, 430), done: () => !G.puddles.length },
 ];
+// walkable route for the footprint trail: through the storage doorway when needed, around shelves via the aisle graph
+function guideRoute(a, b) {
+  const pts = [a];
+  if (inStorage(a) !== inStorage(b)) pts.push(...(inStorage(a) ? [DOOR_IN, DOOR_OUT] : [DOOR_OUT, DOOR_IN]));
+  pts.push(b);
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const p = out[out.length - 1], q = pts[i];
+    if (!inStorage(p) && !inStorage(q) && !clearLine(p.x, p.y, q.x, q.y)) {
+      const st = seenNode(p.x, p.y), en = seenNode(q.x, q.y);
+      [st, ...bfs(st, en)].forEach(k => out.push({ x: NODES[k][0], y: NODES[k][1] }));
+    }
+    out.push(q);
+  }
+  return out;
+}
 function runTutorial() {
   const st = TUT[G.tut];
+  if (st.back?.()) { G.tut--; G.tutGo = true; return; }
   if (!G.tutGo) { G.tutGo = true; st.start?.(); }
   if (!st.done()) return;
   SFX.good(); G.tut++; G.tutGo = false;
@@ -1407,12 +1441,15 @@ function update(dt) {
     const l = Math.hypot(mx, my); mx /= l; my /= l;
     if (mx) p.face = Math.sign(mx);
     p.walk += dt * (dashing ? 16 : 11);
-    const R = 14;
+    const R = 14, ox = p.x, oy = p.y;
     const nx = clamp(p.x + mx * sp * dt, 20 + R, 940 - R);
     if (!OBST.some(o => distRect(nx, p.y, o) < R)) p.x = nx;
     const ny = clamp(p.y + my * sp * dt, 20 + R, 580 - R);
     if (!OBST.some(o => distRect(p.x, ny, o) < R)) p.y = ny;
+    G.bumpT = dist(ox, oy, p.x, p.y) < sp * dt * 0.3 ? (G.bumpT || 0) + dt : 0;
+    if (G.tut != null && G.bumpT > 0.4 && !(G.bumpWarn > 0)) { float(p.x, p.y - 50, '벽이에요! 노란 발자국을 따라가세요', '#ffd166'); SFX.err(); G.bumpWarn = 2.5; }
   }
+  if (G.bumpWarn > 0) G.bumpWarn -= dt;
   // interaction
   G.target = G.mini ? null : findTarget();
   const t = G.target;
@@ -2017,6 +2054,36 @@ function drawLighting() {
   }
   ctx.globalCompositeOperation = 'source-over';
 }
+function drawGuide(ghost) {
+  screenMode();
+  const st = TUT[G.tut], goal = st.stand(), now = performance.now() / 1000, p = G.player;
+  if (!near(p, goal, 40)) {
+    const route = guideRoute({ x: p.x, y: p.y }, goal);
+    let total = 0;
+    for (let i = 1; i < route.length; i++) {
+      const a = route[i - 1], b = route[i], len = dist(a.x, a.y, b.x, b.y);
+      const sx = b.x - a.x, sy = feet(b.y) - feet(a.y), ang = Math.atan2(sy, sx);
+      for (let d = (24 - total % 24) % 24; d < len; d += 24) {
+        const s = total + d; if (s < 30) continue;
+        const t = d / len, x = a.x + sx * t, y = feet(a.y) + sy * t, side = Math.round(s / 24) % 2 ? 1 : -1;
+        const glow = Math.max(0, Math.cos((s - now * 140) / 60));
+        ctx.save(); ctx.translate(x - Math.sin(ang) * side * 5, y + Math.cos(ang) * side * 5); ctx.rotate(ang);
+        ctx.globalAlpha = (0.55 + 0.45 * glow) * (ghost ? 0.5 : 1);
+        ctx.beginPath(); ctx.ellipse(0, 0, 6.5, 3.6, 0, 0, Math.PI * 2); ctx.fillStyle = '#ffc23d'; ctx.fill();
+        ctx.strokeStyle = 'rgba(46,42,51,.6)'; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.restore();
+      }
+      total += len;
+    }
+  }
+  // doorway marker while the way in or out of the storage room matters
+  if (!ghost && (G.tut === 0 && !inStorage(p)) || (G.tut === 1 && inStorage(p))) {
+    const b = Math.abs(Math.sin(now * 4)) * 6, y = feet(118);
+    ctx.beginPath(); ctx.ellipse(330, y, 34 + b, 12 + b * 0.4, 0, 0, Math.PI * 2); ctx.strokeStyle = '#ffc23d'; ctx.lineWidth = 4; ctx.stroke();
+    blob(292, y + 14, 76, 18, 9, '#ffc23d', 2);
+    ctx.fillStyle = '#2a1a00'; ctx.font = `900 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('창고 입구', 330, y + 27);
+  }
+}
 function drawCashierClerk() {
   const y = feet(258);
   drawPerson(222, y, { shirt: '#fbfbf7', skin: '#e9b48a', hair: '#5a3a22', pants: '#2d3436', walk: 0, face: -1, apron: true });
@@ -2030,6 +2097,7 @@ function draw() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
   drawFloor();
   drawBackWall();
+  if (G.tut != null) drawGuide();
   // everything standing, painted back to front by where it touches the floor
   const WALL = T.part;
   const ents = [
@@ -2059,7 +2127,8 @@ function draw() {
   for (const n of Object.values(G.helpers)) if (n) ents.push({ y: n.y + 10, f: () => drawHelper(n) });
   screenMode();
   ents.sort((a, b) => a.y - b.y).forEach(e => e.f());
-  // faint second pass so people behind shelves still show through
+  // faint second pass so people (and the tutorial trail) behind shelves still show through
+  if (G.tut != null) drawGuide(true);
   ctx.globalAlpha = 0.3;
   G.customers.forEach(drawCustomer); drawPlayer();
   for (const n of Object.values(G.helpers)) if (n) drawHelper(n);
@@ -2133,7 +2202,7 @@ function hud() {
   }).join('') : '';
   if (mh !== lastMissions) { missionsEl.innerHTML = mh; missionsEl.hidden = !mh; lastMissions = mh; }
   // tutorial step card
-  const gt = G.tut != null && mode === 'play' ? `<span class="step">${G.tut + 1}/${TUT.length}</span><span>${TUT[G.tut].text.replace(/행동 버튼/g, TOUCH ? '행동 버튼' : '<b>E</b> 키')}</span><button type="button" id="tutSkip">건너뛰기</button>` : '';
+  const gt = G.tut != null && mode === 'play' ? `<span class="step">${G.tut + 1}/${TUT.length}</span><span>${(TUT[G.tut].text + '<small>' + TUT[G.tut].sub() + '</small>').replace(/행동 버튼/g, TOUCH ? '행동 버튼' : '<b>E</b> 키')}</span><button type="button" id="tutSkip">건너뛰기</button>` : '';
   if (gt !== lastGuide) {
     guideEl.innerHTML = gt; guideEl.hidden = !gt; lastGuide = gt;
     if (gt) $('tutSkip').onclick = () => endTutorial(false);
@@ -2148,7 +2217,7 @@ function showTitle() {
   mode = 'title';
   screenEl.hidden = false;
   screenEl.innerHTML = `<div class="card">
-    <span class="tag">PROTOTYPE v1.0</span>
+    <span class="tag">PROTOTYPE v1.0.1</span>
     <h1>나는 편의점 점장이다</h1>
     <p>오늘부터 당신이 이 가게의 점장. 박스를 나르고, 바코드를 찍고, 도시락을 데우고,<br>쏟아진 음료를 닦고, 도둑을 잡으세요. 08:00부터 22:00까지, 약 3분 30초의 하루.</p>
     <div class="shop" id="setup"></div>
